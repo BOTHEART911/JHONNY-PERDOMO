@@ -4,18 +4,18 @@
    Cambia --brand para re-tematizar toda la app.
    ============================================================ */
 :root {
-  --brand: #0E7A5F;         /* verde principal */
-  --brand-700: #0A5D48;
-  --brand-900: #10241E;     /* tinta verde-negra (texto) */
-  --brand-050: #E9F4F0;     /* tinte de fondo */
-  --gold: #F2A81D;          /* acento ámbar */
-  --gold-050: #FDF3DD;
+  --brand: #007BFF;         /* azul principal (marca real) */
+  --brand-700: #0056B3;
+  --brand-900: #0A2540;     /* tinta azul-noche (texto/degradados) */
+  --brand-050: #E7F1FF;     /* tinte de fondo */
+  --gold: #2E96FF;          /* acento azul claro (de la paleta real) */
+  --gold-050: #EAF3FF;
 
-  --bg: #F5F7F5;
+  --bg: #F5F8FC;
   --surface: #FFFFFF;
-  --line: #E4E9E5;
-  --ink: #10241E;
-  --muted: #5E706A;
+  --line: #E3E9F2;
+  --ink: #14223B;
+  --muted: #5B6B84;
   --danger: #D64545;
   --ok: #1E9E6A;
 
@@ -51,6 +51,10 @@ a { color: var(--brand); }
   color: #fff; transition: opacity .5s ease;
 }
 .splash.hide { opacity: 0; pointer-events: none; }
+.splash-logo {
+  width: 96px; height: 96px; object-fit: contain; border-radius: 24px; background: #fff; padding: 8px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.2); animation: pop .6s cubic-bezier(.2,.8,.2,1);
+}
 .splash-mark {
   width: 76px; height: 76px; border-radius: 22px;
   display: grid; place-content: center;
@@ -145,11 +149,11 @@ a { color: var(--brand); }
 .banner {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 14px 16px; border-radius: var(--r-md); text-align: left;
-  background: var(--gold-050); border: 1.5px solid #F4DFA6;
+  background: var(--gold-050); border: 1.5px solid #BFDBFF;
 }
 .banner .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); flex: none; animation: pulse 1.8s infinite; }
 .banner b { font-family: var(--font-display); }
-@keyframes pulse { 0%,100%{ box-shadow: 0 0 0 0 rgba(242,168,29,.5);} 50%{ box-shadow: 0 0 0 8px rgba(242,168,29,0);} }
+@keyframes pulse { 0%,100%{ box-shadow: 0 0 0 0 rgba(46,150,255,.5);} 50%{ box-shadow: 0 0 0 8px rgba(46,150,255,0);} }
 
 /* ---------- Menú de botones ---------- */
 .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -161,7 +165,7 @@ a { color: var(--brand); }
 .tile:active { transform: scale(.98); }
 .tile .ico { width: 44px; height: 44px; border-radius: 13px; display: grid; place-content: center; background: var(--brand-050); }
 .tile .ico svg { width: 22px; height: 22px; stroke: var(--brand-700); }
-.tile.gold .ico { background: var(--gold-050); } .tile.gold .ico svg { stroke: #B4780A; }
+.tile.gold .ico { background: var(--gold-050); } .tile.gold .ico svg { stroke: #0056B3; }
 .tile b { font-family: var(--font-display); font-size: 15px; }
 .tile span { font-size: 12px; color: var(--muted); line-height: 1.3; }
 .tile.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; }
@@ -175,7 +179,7 @@ a { color: var(--brand); }
 }
 .carne::after { /* borde ámbar sutil */
   content: ''; position: absolute; inset: 0; border-radius: inherit;
-  border: 1.5px solid rgba(242,168,29,.5); pointer-events: none;
+  border: 1.5px solid rgba(255,255,255,.35); pointer-events: none;
 }
 .carne .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .carne .label { font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; opacity: .75; font-weight: 700; }
@@ -239,3 +243,18 @@ a { color: var(--brand); }
 @media (min-width: 500px) {
   .app { box-shadow: var(--sh-1); background: var(--bg); }
 }
+
+/* ---------- Formularios y confirmación (módulo participación) ---------- */
+textarea.input, .input.area { height: auto; min-height: 104px; padding: 12px 16px; line-height: 1.45; resize: vertical; font-family: var(--font-body); }
+select.input {
+  appearance: none; -webkit-appearance: none; padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%235B6B84' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+.confirm-list { display: flex; flex-direction: column; }
+.crow { display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.crow:last-child { border-bottom: 0; }
+.crow span { color: var(--muted); flex: none; }
+.crow b { text-align: right; font-family: var(--font-display); font-weight: 600; }
+.crow.block { flex-direction: column; gap: 4px; }
+.crow.block b { text-align: left; font-weight: 500; font-family: var(--font-body); white-space: pre-line; }
