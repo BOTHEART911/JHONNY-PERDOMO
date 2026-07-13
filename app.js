@@ -64,7 +64,8 @@ const I = {
   card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></svg>',
   logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
   play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
-  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>'
 };
 
 /* ---------- Menú (icono + nombre + descripción) ---------- */
@@ -80,7 +81,7 @@ const MENU = [
   { id: 'refiere',   icon: 'wa',    title: 'Refiere por WhatsApp', desc: 'Invita a los tuyos' },
   { id: 'lideres',   icon: 'star',  title: 'Líderes',           desc: 'Zona de líderes' }
 ];
-const IMPLEMENTADAS = new Set(['tarjeta']); // se irán activando por fases
+const IMPLEMENTADAS = new Set(['tarjeta', 'datos', 'solicitud', 'ideas']); // se irán activando por fases
 
 /* ============================================================
    RÚTER
@@ -91,13 +92,18 @@ window.addEventListener('hashchange', render);
 function render() {
   const route = (location.hash.replace(/^#\//, '') || '').split('?')[0];
   const user = getActive();
+  if (route === 'registro') return viewRegistro();
   if (!user && route !== 'login') return go('login');
-
   if (route === 'login' || !user) return viewLogin();
-  if (route === 'tarjeta') return viewTarjeta(user);
-  if (route === '' || route === 'home') return viewHome(user);
-  // menú aún no implementado
-  return viewHome(user);
+  switch (route) {
+    case 'tarjeta':   return viewTarjeta(user);
+    case 'datos':     return viewDatos(user);
+    case 'solicitud': return viewSolicitud(user);
+    case 'ideas':     return viewIdeas(user);
+    case '':
+    case 'home':      return viewHome(user);
+    default:          return viewHome(user);
+  }
 }
 
 /* ============================================================
@@ -130,13 +136,15 @@ function viewLogin() {
           <input class="input" id="pin" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" /></label>
         <button class="btn btn-primary btn-block" id="enter">Entrar</button>
       </div>
-      <p class="center small muted">¿No estás registrado? Pídele a tu líder que te ingrese.</p>
+      <button class="btn btn-quiet btn-block" id="goReg">Crear mi registro</button>
+      <p class="center small muted">¿Aún no estás en la base? Regístrate y sé parte del cambio.</p>
     </div>`;
   app.hidden = false; hideSplash();
 
   const doc = $('#doc'), pin = $('#pin');
   app.querySelectorAll('.chip').forEach(c => c.onclick = () => { doc.value = c.dataset.doc; pin.focus(); });
   $('#enter').onclick = doLogin;
+  $('#goReg').onclick = () => go('registro');
   [doc, pin].forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); }));
 
   async function doLogin() {
@@ -297,6 +305,188 @@ function openVideo(url) {
   const close = () => closeLayer();
   bd.onclick = close; mv.querySelector('.close').onclick = close;
   layer.append(bd, mv);
+}
+
+/* ============================================================
+   MÓDULO PARTICIPACIÓN — registro · datos · solicitud · ideas
+   ============================================================ */
+
+/* Catálogos (con caché) */
+let _resiCache = null, _serviCache = null;
+async function getResidencias() { if (!_resiCache) _resiCache = await api('pub.residencias'); return _resiCache; }
+async function getServicios() { if (!_serviCache) _serviCache = await api('pub.servicios'); return _serviCache; }
+
+/* Constructores de campos */
+function backbar(title) { return `<div class="appbar"><button class="icon-btn" id="backbtn">${I.back}</button><div class="who"><b>${esc(title)}</b><span>Jhonny Perdomo</span></div></div>`; }
+function field(label, inner) { return `<label class="field"><span>${esc(label)}</span>${inner}</label>`; }
+function inputEl(id, attrs = '') { return `<input class="input" id="${id}" autocomplete="off" ${attrs} />`; }
+function areaEl(id, ph, rows = 3) { return `<textarea class="input area" id="${id}" rows="${rows}" placeholder="${esc(ph || '')}"></textarea>`; }
+function selectEl(id, options, ph) {
+  return `<select class="input" id="${id}"><option value="">${esc(ph || 'Selecciona')}</option>${(options || []).map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+}
+const val = id => (($('#' + id) || {}).value || '').trim();
+
+/* Hoja de confirmación (reemplaza el "resumen" con SweetAlert) */
+function crow(label, v) { return `<div class="crow"><span>${esc(label)}</span><b>${esc(v || '—')}</b></div>`; }
+function crowBlock(label, v) { return `<div class="crow block"><span>${esc(label)}</span><b>${esc(v || 'Sin información')}</b></div>`; }
+function confirmar(title, rowsHtml) {
+  return new Promise(resolve => {
+    openSheet(`<div class="grip"></div><h2 class="h2" style="margin-bottom:10px;">${esc(title)}</h2>
+      <div class="confirm-list">${rowsHtml}</div>
+      <div class="stack" style="margin-top:18px;">
+        <button class="btn btn-primary btn-block" data-yes>Confirmar</button>
+        <button class="btn btn-quiet btn-block" data-no>Seguir editando</button>
+      </div>`);
+    layer.querySelector('[data-yes]').onclick = () => { closeLayer(); resolve(true); };
+    layer.querySelector('[data-no]').onclick = () => { closeLayer(); resolve(false); };
+  });
+}
+function saving(btn, on) { btn.disabled = on; btn.dataset.txt = btn.dataset.txt || btn.textContent; btn.innerHTML = on ? '<span class="spinner"></span>' : btn.dataset.txt; }
+
+/* ---------- REGISTRO (nuevo usuario) ---------- */
+async function viewRegistro() {
+  app.innerHTML = `${backbar('Crear mi registro')}
+    <div class="pad stack">
+      <p class="muted">Regístrate para ser parte del cambio en Flandes. Después entrarás con tu documento y un PIN: los <b>últimos 4 dígitos</b> de tu documento.</p>
+      <div class="card pad stack">
+        ${field('Nombre completo', inputEl('r-nombre', 'placeholder="Tus nombres y apellidos"'))}
+        ${field('Documento', inputEl('r-doc', 'inputmode="numeric" placeholder="Tu número de documento"'))}
+        ${field('WhatsApp', inputEl('r-tel', 'inputmode="numeric" maxlength="10" placeholder="Número de 10 dígitos"'))}
+        ${field('Residencia', '<div id="r-resi-wrap">' + selectEl('r-resi', [], 'Cargando…') + '</div>')}
+        ${field('N° de Referido (opcional)', inputEl('r-ref', 'inputmode="numeric" placeholder="Código de quien te invitó"'))}
+        <button class="btn btn-primary btn-block" id="r-save">Crear mi registro</button>
+      </div>
+    </div>`;
+  app.hidden = false; hideSplash();
+  $('#backbtn').onclick = () => go('login');
+  getResidencias().then(l => { $('#r-resi-wrap').innerHTML = selectEl('r-resi', l, 'Selecciona tu residencia'); }).catch(() => {});
+
+  $('#r-save').onclick = async () => {
+    const body = { documento: val('r-doc').replace(/\D/g, ''), nombre: val('r-nombre'), telefono: val('r-tel').replace(/\D/g, ''), residencia: val('r-resi'), referencia: val('r-ref').replace(/\D/g, '') };
+    if (!/^\d{6,10}$/.test(body.documento)) return toast('Documento inválido (6 a 10 dígitos)', 'err');
+    if (!body.nombre) return toast('Escribe tu nombre completo', 'err');
+    if (!/^\d{10}$/.test(body.telefono)) return toast('El WhatsApp debe tener 10 dígitos', 'err');
+    if (!body.residencia) return toast('Selecciona tu residencia', 'err');
+    if (body.referencia && !/^\d{1,3}$/.test(body.referencia)) return toast('El N° de Referido tiene 1 a 3 dígitos', 'err');
+
+    const ok = await confirmar('Confirma tu registro',
+      crow('Nombre', body.nombre) + crow('Documento', body.documento) + crow('WhatsApp', body.telefono) +
+      crow('Residencia', body.residencia) + crow('Referido', body.referencia || 'Sin referido'));
+    if (!ok) return;
+
+    const btn = $('#r-save'); saving(btn, true);
+    try {
+      const r = await api('pub.registrar', {}, 'POST', body);
+      if (!r.success) { toast(r.message || 'No pudimos registrarte', 'err'); saving(btn, false); return; }
+      // Ingreso automático (PIN = últimos 4 del documento)
+      const pin = body.documento.slice(-4);
+      const lg = await api('pub.login', {}, 'POST', { documento: body.documento, pin });
+      if (lg.ok) { saveSession(lg.user); toast('¡Registro exitoso! Bienvenido', 'ok'); go('home'); }
+      else { toast('Registro exitoso. Ingresa con tu documento', 'ok'); go('login'); }
+    } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
+  };
+}
+
+/* ---------- ACTUALIZAR DATOS ---------- */
+async function viewDatos(user) {
+  app.innerHTML = `${backbar('Actualizar mis datos')}
+    <div class="pad stack"><div class="card pad stack">
+      ${field('Documento', inputEl('d-doc', 'readonly'))}
+      ${field('Nombre', inputEl('d-nombre', ''))}
+      ${field('WhatsApp (nuevo)', inputEl('d-tel', 'inputmode="numeric" maxlength="10" placeholder="Déjalo vacío si no cambia"'))}
+      ${field('Residencia', '<div id="d-resi-wrap">' + selectEl('d-resi', [], 'Sin cambios') + '</div>')}
+      ${field('N° de Referido (opcional)', inputEl('d-ref', 'inputmode="numeric" placeholder="Solo si cambia"'))}
+      <button class="btn btn-primary btn-block" id="d-save">Guardar cambios</button>
+    </div></div>`;
+  app.hidden = false; hideSplash();
+  $('#backbtn').onclick = () => go('home');
+  $('#d-doc').value = user.documento;
+  getResidencias().then(l => { $('#d-resi-wrap').innerHTML = selectEl('d-resi', l, 'Sin cambios'); }).catch(() => {});
+  try { const r = await api('pub.validarDoc', { documento: user.documento }); $('#d-nombre').value = (r.existe && r.nombre) || user.nombre || ''; }
+  catch { $('#d-nombre').value = user.nombre || ''; }
+
+  $('#d-save').onclick = async () => {
+    const body = { documento: user.documento, nombre: val('d-nombre'), telefono: val('d-tel').replace(/\D/g, ''), residencia: val('d-resi'), referencia: val('d-ref').replace(/\D/g, '') };
+    if (body.telefono && !/^\d{10}$/.test(body.telefono)) return toast('El WhatsApp debe tener 10 dígitos', 'err');
+    if (body.referencia && !/^\d{1,3}$/.test(body.referencia)) return toast('El N° de Referido tiene 1 a 3 dígitos', 'err');
+
+    const ok = await confirmar('Confirma la actualización',
+      crow('Documento', body.documento) + crow('WhatsApp', body.telefono || 'Sin cambios') +
+      crow('Residencia', body.residencia || 'Sin cambios') + crow('Referido', body.referencia || 'Sin cambios'));
+    if (!ok) return;
+
+    const btn = $('#d-save'); saving(btn, true);
+    try {
+      const r = await api('pub.actualizar', {}, 'POST', body);
+      if (!r.success) { toast(r.message || 'No se pudo guardar', 'err'); saving(btn, false); return; }
+      const s = getActive(); if (body.nombre) s.nombre = body.nombre.toUpperCase(); if (body.residencia) s.residencia = body.residencia; saveSession(s);
+      toast('Datos actualizados', 'ok'); go('home');
+    } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
+  };
+}
+
+/* Prellenar nombre/tel/residencia desde el servidor */
+async function prefill(user) {
+  try { const r = await api('pub.validarDoc', { documento: user.documento }); if (r.existe) return { nombre: r.nombre || user.nombre || '', telefono: r.telefono || '', residencia: r.residencia || user.residencia || '' }; } catch {}
+  return { nombre: user.nombre || '', telefono: '', residencia: user.residencia || '' };
+}
+
+/* ---------- REALIZA TU SOLICITUD ---------- */
+async function viewSolicitud(user) {
+  app.innerHTML = `${backbar('Realiza tu solicitud')}
+    <div class="pad stack"><div class="card pad stack">
+      ${field('Servicio', '<div id="s-serv-wrap">' + selectEl('s-servicio', [], 'Cargando…') + '</div>')}
+      ${field('Tu solicitud', areaEl('s-solicitud', 'Describe brevemente lo que necesitas', 4))}
+      <p class="small muted" id="s-quien">Cargando tus datos…</p>
+      <button class="btn btn-primary btn-block" id="s-save">Enviar solicitud</button>
+    </div></div>`;
+  app.hidden = false; hideSplash();
+  $('#backbtn').onclick = () => go('home');
+  getServicios().then(l => { $('#s-serv-wrap').innerHTML = selectEl('s-servicio', l, 'Selecciona un servicio'); }).catch(() => {});
+  const p = await prefill(user); $('#s-quien').innerHTML = `Se enviará a nombre de <b>${esc(p.nombre)}</b>`;
+
+  $('#s-save').onclick = async () => {
+    const body = { documento: user.documento, nombre: p.nombre, telefono: p.telefono, residencia: p.residencia, servicio: val('s-servicio'), solicitud: val('s-solicitud') };
+    if (!body.servicio) return toast('Selecciona un servicio', 'err');
+    if (!body.solicitud) return toast('Describe tu solicitud', 'err');
+    const ok = await confirmar('Confirma tu solicitud', crow('Servicio', body.servicio) + crowBlock('Solicitud', body.solicitud));
+    if (!ok) return;
+    const btn = $('#s-save'); saving(btn, true);
+    try { const r = await api('pub.solicitud', {}, 'POST', body); if (!r.success) { toast(r.message || 'No se pudo enviar', 'err'); saving(btn, false); return; } toast('Solicitud enviada', 'ok'); go('home'); }
+    catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
+  };
+}
+
+/* ---------- SUMA TUS IDEAS ---------- */
+async function viewIdeas(user) {
+  app.innerHTML = `${backbar('Suma tus ideas')}
+    <div class="pad stack">
+      <p class="muted">Comparte tus ideas para Flandes en los aspectos que quieras. Puedes llenar solo los que desees.</p>
+      <div class="card pad stack">
+        ${field('Social', areaEl('i-social', 'Ideas sociales…'))}
+        ${field('Institucional', areaEl('i-institucional', 'Ideas institucionales…'))}
+        ${field('Económico', areaEl('i-economico', 'Ideas económicas…'))}
+        ${field('Ambiental', areaEl('i-ambiental', 'Ideas ambientales…'))}
+        ${field('Otros', areaEl('i-otros', 'Otras ideas…'))}
+        <button class="btn btn-primary btn-block" id="i-save">Enviar mis ideas</button>
+      </div>
+    </div>`;
+  app.hidden = false; hideSplash();
+  $('#backbtn').onclick = () => go('home');
+  const p = await prefill(user);
+
+  $('#i-save').onclick = async () => {
+    const body = { documento: user.documento, nombre: p.nombre, telefono: p.telefono, residencia: p.residencia,
+      social: val('i-social'), institucional: val('i-institucional'), economico: val('i-economico'), ambiental: val('i-ambiental'), otros: val('i-otros') };
+    if (!(body.social || body.institucional || body.economico || body.ambiental || body.otros)) return toast('Escribe al menos una idea', 'err');
+    const ok = await confirmar('Confirma tus ideas',
+      crowBlock('Social', body.social) + crowBlock('Institucional', body.institucional) + crowBlock('Económico', body.economico) +
+      crowBlock('Ambiental', body.ambiental) + crowBlock('Otros', body.otros));
+    if (!ok) return;
+    const btn = $('#i-save'); saving(btn, true);
+    try { const r = await api('pub.ideas', {}, 'POST', body); if (!r.success) { toast(r.message || 'No se pudo enviar', 'err'); saving(btn, false); return; } toast('¡Gracias por tus ideas!', 'ok'); go('home'); }
+    catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
+  };
 }
 
 /* ---------- Splash ---------- */
