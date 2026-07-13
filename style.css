@@ -258,3 +258,42 @@ select.input {
 .crow b { text-align: right; font-family: var(--font-display); font-weight: 600; }
 .crow.block { flex-direction: column; gap: 4px; }
 .crow.block b { text-align: left; font-weight: 500; font-family: var(--font-body); white-space: pre-line; }
+
+/* ---------- Íconos dentro de botones (arregla el "salido") ---------- */
+.btn svg { width: 19px; height: 19px; flex: none; }
+.hero-play svg { width: 18px; height: 18px; }
+
+/* ---------- Login: identidad ---------- */
+.login { max-width: var(--maxw); margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 24px 18px calc(24px + env(safe-area-inset-bottom)); }
+.login-id { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.login-logo { width: 84px; height: 84px; object-fit: contain; border-radius: 22px; background: #fff; padding: 8px; box-shadow: var(--sh-1); }
+.login-id .h1 { margin-top: 10px; }
+.login-banner { width: 100%; max-width: 320px; margin-top: 10px; border-radius: var(--r-md); }
+.login-foot { margin-top: 6px; }
+.pin-input { text-align: center; letter-spacing: 12px; font-size: 24px; font-family: var(--font-display); font-weight: 700; }
+
+/* ---------- Plan Premium / Estándar ---------- */
+.plan-badge { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 999px; font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: .3px; background: var(--brand-050); color: var(--brand-700); }
+.plan-badge.premium { background: linear-gradient(100deg, #FFE9A8, #F7C948); color: #6B4E00; box-shadow: 0 3px 10px rgba(247,201,72,.4); }
+
+/* ---------- Combobox con búsqueda ---------- */
+.combo { position: relative; }
+.combo-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 6px); max-height: 240px; overflow: auto; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r-md); box-shadow: var(--sh-2); padding: 6px; }
+.combo-opt { display: block; width: 100%; text-align: left; padding: 11px 12px; border-radius: 10px; font-size: 15px; }
+.combo-opt:hover, .combo-opt:focus { background: var(--brand-050); }
+.combo-empty { padding: 12px; color: var(--muted); font-size: 14px; text-align: center; }
+
+/* ---------- Referido (check) ---------- */
+.ref-toggle { padding: 4px 0; }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; cursor: pointer; user-select: none; }
+.check input { width: 20px; height: 20px; accent-color: var(--brand); }
+
+/* ---------- Ícono en la tarjeta ---------- */
+.carne-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 12px; background: #fff; padding: 5px; flex: none; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+
+/* ---------- Banner instalar ---------- */
+.install { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-md); background: var(--brand-050); border: 1.5px solid #CFE4FF; }
+.install-txt { flex: 1; display: flex; flex-direction: column; }
+.install-txt b { font-family: var(--font-display); font-size: 14px; }
+.install-txt span { font-size: 12px; color: var(--muted); }
+.install .btn { height: 42px; padding: 0 14px; font-size: 13px; }: pre-line; }
