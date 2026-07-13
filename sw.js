@@ -1,10 +1,13 @@
-/* Service Worker — Jhonny Perdomo App Pública */
-importScripts('version.js');
+/* Service Worker — Jhonny Perdomo App Pública
+   👉 IMPORTANTE: sube SW_VERSION en CADA despliegue.
+   Al cambiar este número, el archivo sw.js cambia y el navegador
+   detecta el nuevo service worker, borra el caché viejo y actualiza la app.
+   (Mantenlo igual al APP_VERSION de version.js). */
+const SW_VERSION = '1.0.0';
 
-const CACHE = 'jp-pub-' + (self.APP_VERSION || '1');
+const CACHE = 'jp-pub-' + SW_VERSION;
 const SHELL = [
-  './', './index.html', './style.css', './app.js', './version.js', './manifest.json',
-  './icons/icon-192.png', './icons/icon-512.png'
+  './', './index.html', './style.css', './app.js', './version.js', './manifest.json'
 ];
 
 self.addEventListener('install', (e) => {
@@ -25,7 +28,7 @@ self.addEventListener('fetch', (e) => {
 
   // Datos del backend y QR: siempre a la red (no cachear datos vivos)
   if (url.href.includes('/exec') || url.hostname.includes('qrserver') || url.hostname.includes('google.com')) {
-    return; // deja pasar a la red normal
+    return;
   }
 
   // App shell: cache-first con actualización en segundo plano
