@@ -27,7 +27,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   // Datos del backend y QR: siempre a la red (no cachear datos vivos)
-  if (url.href.includes('/exec') || url.hostname.includes('qrserver') || url.hostname.includes('google.com')) {
+  if (url.pathname.endsWith('version.json') || url.href.includes('/exec') || url.hostname.includes('qrserver') || url.hostname.includes('google.com')) {
     return;
   }
 
