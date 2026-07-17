@@ -1,0 +1,66 @@
+/* ============================================================================
+ * CAPA 7 · ONDA AL TOCAR (ripple)  (parte CSS)
+ * ----------------------------------------------------------------------------
+ * QUÉ HACE
+ *   Onda de tinta estilo Android que sale del punto exacto donde tocas, en
+ *   botones, tiles del inicio, chips, teclado PIN y botones de tarjeta.
+ *
+ * INSTALACIÓN (una sola línea, en el <head>, DESPUÉS de style.css)
+ *   <link rel="stylesheet" href="capa-7-ripple.css" />
+ *
+ * PAREJA
+ *   capa-7-ripple.js  (obligatoria)
+ *
+ * NOTAS
+ *   · `overflow: hidden` recorta la onda dentro del control; NO recorta la
+ *     sombra propia del control (las sombras exteriores se ven igual).
+ *   · La onda es blanca sobre fondos oscuros (.btn-primary, .btn-gold,
+ *     .pin-key:active) y azul de marca sobre fondos claros.
+ *   · Se apaga con "reducir movimiento" (lo controla el JS de la pareja).
+ * ========================================================================== */
+
+.btn,
+.tile,
+.chip,
+.icon-btn,
+.pin-key,
+.rc-btn,
+.opt-row,
+.login-tab,
+.nt-nueva {
+  overflow: hidden;
+}
+
+.nt-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: scale(0);
+  opacity: .28;
+  background: var(--brand, #007BFF);
+  animation: nt7-onda .5s cubic-bezier(.25, .6, .3, 1) forwards;
+  z-index: 0;
+}
+
+/* Sobre fondos de marca la onda va en blanco */
+.btn-primary .nt-ripple,
+.btn-gold .nt-ripple,
+.nt-nueva .nt-ripple {
+  background: #fff;
+  opacity: .35;
+}
+
+@keyframes nt7-onda {
+  to { transform: scale(1); opacity: 0; }
+}
+
+/* El contenido del control debe quedar por encima de la onda */
+.btn > *, .tile > *, .chip > *, .icon-btn > *,
+.rc-btn > *, .opt-row > *, .login-tab > *, .nt-nueva > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-ripple { display: none; }
+}
