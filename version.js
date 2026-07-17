@@ -4,4 +4,4 @@
  * si cambia, limpia caches y recarga automáticamente en todos
  * los dispositivos. También alimenta el texto "Versión X".
  * ============================================================ */
-var APP_VERSION = "2026.07.15.5";
+var APP_VERSION = "2026.07.15.6";
