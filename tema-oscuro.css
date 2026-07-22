@@ -1,0 +1,73 @@
+/* ================================================================
+   MODO OSCURO — App PÚBLICA Jhonny Perdomo
+   Qué hace: define el tema oscuro (se activa con html.oscuro). El
+     botón luna/sol y la memoria de la elección los pone tema-oscuro.js.
+   Cómo convierte "todo": redefine las variables del sistema de diseño
+     (--bg/--surface/--ink/--muted/--line/--brand*) → el 90% de la app
+     voltea sola. Debajo se corrige a mano/auto cada color FIJO (no-var)
+     para que NO quede texto invisible. Lo que debe seguir claro (el QR
+     de la tarjeta, logos, el QR del bot) se respeta.
+   Instalación: <link rel="stylesheet" href="tema-oscuro.css"> al final
+     del <head>, DESPUÉS de style.css. Pareja: tema-oscuro.js.
+   Reversible: quita el <link>, el <script> y el mini-script del <head>.
+   ================================================================ */
+
+html.oscuro{
+  --bg:#0F1826; --surface:#182333; --line:#2A3A4F;
+  --ink:#E9EEF7; --muted:#A2B4CE;
+  --brand:#4EA0FF; --brand-700:#6AA9FF;
+  --brand-050:#12243D; --gold-050:#14263D;
+  --danger:#F06868; --ok:#33C08A;
+  --sh-1:0 1px 2px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.42);
+  --sh-2:0 12px 34px rgba(0,0,0,.62);
+  --sh-brand:0 12px 30px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+/* --brand-900 se deja OSCURO a propósito: se usa como FONDO (hero, toast,
+   footer). Sus usos como TEXTO se corrigen explícitamente aquí abajo. */
+html.oscuro body,html.oscuro .app{ background:var(--bg); }
+html.oscuro .field>span{ color:var(--ink); }
+html.oscuro .skeleton{ background:linear-gradient(90deg,var(--line) 25%,#243350 37%,var(--line) 63%); background-size:400% 100%; }
+html.oscuro ::selection{ background:rgba(78,160,255,.35); }
+/* --- superficies de CONTENIDO que venían en blanco duro (#fff) --- */
+html.oscuro .com-card,html.oscuro .com-pill,html.oscuro .com-media{ background:var(--surface); }
+html.oscuro .com-card-img{ background:var(--line); }
+html.oscuro .com-card-std{ color:var(--ink); }
+html.oscuro .com-card-desc{ color:var(--muted); }
+html.oscuro .com-card-hi{ background:#123528; color:#7FE3B4; }
+
+/* --- reglas por color fijo (derivadas del CSS real) --- */
+html.oscuro .plan-badge.premium{ background:linear-gradient(100deg, #3F4240, #3D3B2D); color:#C1B594; }
+html.oscuro .rc-badge.ok{ background:#36404A; color:#9FC9B3; }
+html.oscuro .rc-badge.no{ background:#3A3E4A; color:#E5ACA6; }
+html.oscuro .rc-badge.warn{ background:#3A4048; color:#E1C7A1; }
+html.oscuro .rc-badge.mut{ background:#373F4C; }
+html.oscuro .rc-btn:active{ background:#333D4D; }
+html.oscuro .opt-row:active{ background:#333D4D; }
+html.oscuro .estado.ok{ background:#36404A; color:#9FC9B3; }
+html.oscuro .estado.warn{ background:#3A4048; color:#E1C7A1; }
+html.oscuro .estado.no{ background:#3A3E4A; color:#E5ACA6; }
+html.oscuro .estado.mut{ background:#373F4C; }
+html.oscuro .est-ing{ background:#363F4D; color:#A3BDF7; }
+html.oscuro .est-pen{ background:#3A4048; color:#E1C7A1; }
+html.oscuro .est-seg{ background:#383E4D; color:#C8ACF7; }
+html.oscuro .est-ate{ background:#36404A; color:#9FC9B3; }
+html.oscuro .est-rec{ background:#3A3E4B; color:#F0A4C6; }
+html.oscuro .btn-danger{ background:#3A3E4A; color:#E5ACA6; }
+html.oscuro .btn-danger:active{ background:#393A46; }
+html.oscuro .com-spec{ color:#A9A9A9; }
+html.oscuro .com-offer-label{ color:#9B9B9B; }
+html.oscuro .casa-item-d{ color:#BFBFBF; }
+html.oscuro .em-pol{ background:#363F4D; color:#94B8DF; }
+html.oscuro .em-bom{ background:#3A3E4A; color:#D8A2A2; }
+html.oscuro .em-sal{ background:#36404A; color:#9CC4B5; }
+
+/* ---- Lote 18/07 · B1 · E — Mis compromisos (pública) ---- */
+html.oscuro .estado.asg{ background:#26344B; color:#9DB6E6; }
+html.oscuro .lc-tzn{ color:#9DB6E6; }
+html.oscuro .tz-item{ background:#1E2A3B; }
+html.oscuro .tz-meta b{ color:var(--ink); }
+
+/* ---- Ajuste 22/07 · botón "Ceder" de la tarjeta de referido ---- */
+html.oscuro .rc-btn.ceder{ background:#3A3E4A; color:#E1C7A1; }
+html.oscuro .rc-btn.ceder:active{ background:#434757; }
