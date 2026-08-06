@@ -1,0 +1,150 @@
+/* ============================================================================
+ * CAPA 1 · MICRO-EFECTOS BASE  (app pública Jhonny Perdomo)
+ * ----------------------------------------------------------------------------
+ * QUÉ HACE
+ *   Presión con resorte al tocar botones, tiles, chips, teclado PIN y botones
+ *   de tarjeta; pestañas de login con rebote; "pop" con resorte al abrir las
+ *   hojas/modales (.sheet); entrada escalonada de las listas; aparición suave
+ *   de la pantalla.
+ *
+ * INSTALACIÓN (una sola línea, en el <head>, DESPUÉS de style.css)
+ *   <link rel="stylesheet" href="capa-1-micro.css" />
+ *
+ * PAREJA
+ *   Ninguna. Archivo autónomo, sin JS.
+ *
+ * NOTAS
+ *   · No toca index.html, app.js ni style.css. Se quita borrando la línea.
+ *   · Gana a style.css solo por orden de carga (misma especificidad).
+ *   · La "aparición de pantalla" se desactiva sola si instalas la CAPA 4
+ *     (transición lateral): la capa 4 marca <html class="nt-tx"> y esta capa
+ *     le cede el paso para que no se animen dos cosas a la vez.
+ *   · Todo se apaga con "reducir movimiento" del sistema.
+ *   · Clases reales usadas de esta app: .btn .tile .chip .icon-btn .pin-key
+ *     .rc-btn .opt-row .login-tab .sheet .rcard .lcard .com-card .nt-card
+ *     .em-card .casa-dia
+ * ========================================================================== */
+
+/* ---- 1. Presión con resorte -------------------------------------------- */
+.btn,
+.tile,
+.chip,
+.icon-btn,
+.pin-key,
+.rc-btn,
+.opt-row,
+.pass-eye,
+.hero-editfoto,
+.com-play,
+.nt-nueva {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .22s cubic-bezier(.2, .9, .25, 1.5),
+              background .18s ease,
+              box-shadow .22s ease,
+              color .18s ease;
+  will-change: transform;
+}
+
+.btn:active            { transform: scale(.955); }
+.tile:active           { transform: scale(.965); }
+.chip:active           { transform: scale(.955); }
+.icon-btn:active       { transform: scale(.9); }
+.pin-key:active        { transform: scale(.9); }
+.rc-btn:active         { transform: scale(.94); }
+.opt-row:active        { transform: scale(.98); }
+.pass-eye:active       { transform: scale(.9); }
+.hero-editfoto:active  { transform: scale(.92); }
+.com-play:active       { transform: scale(.9); }
+.nt-nueva:active       { transform: scale(.97); }
+
+/* Botón deshabilitado (mientras guarda): no debe "responder" al toque */
+.btn:disabled:active { transform: none; }
+
+/* ---- 2. Pestañas del login con rebote ---------------------------------- */
+.login-tab {
+  transition: background .2s ease, color .2s ease,
+              transform .3s cubic-bezier(.2, .9, .25, 1.6);
+}
+.login-tab.active { animation: nt1-tab-pop .34s cubic-bezier(.2, .9, .25, 1.5); }
+@keyframes nt1-tab-pop {
+  0%   { transform: scale(.9); }
+  55%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* ---- 3. "Pop" con resorte al abrir hojas / modales --------------------- */
+/* style.css ya sube la hoja con `up .28s`; aquí solo se cambia la curva y se
+   añade el asentamiento final. */
+.sheet {
+  animation: nt1-sheet-up .42s cubic-bezier(.16, 1.02, .28, 1.02) !important;
+}
+@keyframes nt1-sheet-up {
+  0%   { transform: translateY(100%); }
+  78%  { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+/* ---- 4. Entrada escalonada de listas ----------------------------------- */
+/* Solo tarjetas de lista. Los formularios y las vistas de detalle no entran. */
+#app .rcard,
+#app .lcard,
+#app .com-card,
+#app .nt-card,
+#app .em-card,
+#app .casa-dia {
+  animation: nt1-item-in .38s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes nt1-item-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Escalonado: hasta el 10º elemento; del 11 en adelante entran ya visibles
+   (evita que el final de una lista larga tarde en aparecer). */
+#app .rcard:nth-child(1),  #app .lcard:nth-child(1),  #app .com-card:nth-child(1),
+#app .nt-card:nth-child(1), #app .em-card:nth-child(1), #app .casa-dia:nth-child(1)  { animation-delay: 0ms; }
+#app .rcard:nth-child(2),  #app .lcard:nth-child(2),  #app .com-card:nth-child(2),
+#app .nt-card:nth-child(2), #app .em-card:nth-child(2), #app .casa-dia:nth-child(2)  { animation-delay: 45ms; }
+#app .rcard:nth-child(3),  #app .lcard:nth-child(3),  #app .com-card:nth-child(3),
+#app .nt-card:nth-child(3), #app .em-card:nth-child(3), #app .casa-dia:nth-child(3)  { animation-delay: 90ms; }
+#app .rcard:nth-child(4),  #app .lcard:nth-child(4),  #app .com-card:nth-child(4),
+#app .nt-card:nth-child(4), #app .em-card:nth-child(4), #app .casa-dia:nth-child(4)  { animation-delay: 135ms; }
+#app .rcard:nth-child(5),  #app .lcard:nth-child(5),  #app .com-card:nth-child(5),
+#app .nt-card:nth-child(5), #app .em-card:nth-child(5), #app .casa-dia:nth-child(5)  { animation-delay: 175ms; }
+#app .rcard:nth-child(6),  #app .lcard:nth-child(6),  #app .com-card:nth-child(6),
+#app .nt-card:nth-child(6), #app .em-card:nth-child(6), #app .casa-dia:nth-child(6)  { animation-delay: 210ms; }
+#app .rcard:nth-child(7),  #app .lcard:nth-child(7),  #app .com-card:nth-child(7),
+#app .nt-card:nth-child(7), #app .em-card:nth-child(7), #app .casa-dia:nth-child(7)  { animation-delay: 240ms; }
+#app .rcard:nth-child(8),  #app .lcard:nth-child(8),  #app .com-card:nth-child(8),
+#app .nt-card:nth-child(8), #app .em-card:nth-child(8), #app .casa-dia:nth-child(8)  { animation-delay: 265ms; }
+#app .rcard:nth-child(9),  #app .lcard:nth-child(9),  #app .com-card:nth-child(9),
+#app .nt-card:nth-child(9), #app .em-card:nth-child(9), #app .casa-dia:nth-child(9)  { animation-delay: 285ms; }
+#app .rcard:nth-child(n + 10),  #app .lcard:nth-child(n + 10),
+#app .com-card:nth-child(n + 10), #app .nt-card:nth-child(n + 10),
+#app .em-card:nth-child(n + 10), #app .casa-dia:nth-child(n + 10) { animation: none; }
+
+/* ---- 5. Aparición de pantalla ------------------------------------------ */
+/* Cede el paso a la CAPA 4 si está instalada (ella marca html.nt-tx). */
+html:not(.nt-tx) #app > * {
+  animation: nt1-view-in .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes nt1-view-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- 6. Respeto a "reducir movimiento" --------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .btn, .tile, .chip, .icon-btn, .pin-key, .rc-btn, .opt-row,
+  .pass-eye, .hero-editfoto, .com-play, .nt-nueva, .login-tab {
+    transition: background .15s ease, color .15s ease;
+  }
+  .btn:active, .tile:active, .chip:active, .icon-btn:active, .pin-key:active,
+  .rc-btn:active, .opt-row:active, .pass-eye:active, .hero-editfoto:active,
+  .com-play:active, .nt-nueva:active { transform: none; }
+  .login-tab.active { animation: none; }
+  .sheet { animation: none !important; }
+  #app .rcard, #app .lcard, #app .com-card, #app .nt-card,
+  #app .em-card, #app .casa-dia { animation: none; }
+  html:not(.nt-tx) #app > * { animation: none; }
+}

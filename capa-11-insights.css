@@ -1,0 +1,371 @@
+/* ================================================================
+   CAPA 11 · CONSULTAS DE MI GRUPO — app PÚBLICA (28/07/2026)
+   Pareja obligatoria de capa-11-insights.js.
+   Instalación: <link rel="stylesheet" href="capa-11-insights.css">
+   en el <head>, DESPUÉS de style.css y ANTES de tema-oscuro.css.
+
+   MODO OSCURO: no hay un solo color escrito a mano. Todo sale de las
+   variables del sistema (--surface, --ink, --line, --brand, --bg…),
+   así que el tema oscuro voltea esta capa sola, sin reglas extra.
+   Es el mismo trato que la capa gemela de la app privada.
+   ================================================================ */
+
+/* ---------- Botón flotante ---------- */
+.iq-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--brand);
+  font-family: var(--font-display), var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--sh-2);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;              /* si no, el móvil se queda con el dedo para hacer scroll */
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.iq-fab:hover { transform: translateY(-2px); }
+.iq-fab:active { transform: translateY(0) scale(.97); }
+.iq-fab:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+.iq-fab-ic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--brand-050);
+  color: var(--brand);
+}
+.iq-fab-tx { padding-right: 2px; }
+
+.iq-fab-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 1.5px solid var(--brand);
+  opacity: 0;
+  animation: iq-respira 3.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes iq-respira {
+  0%   { opacity: .45; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(1.12); }
+  100% { opacity: 0;   transform: scale(1.12); }
+}
+.iq-fab.iq-sin-motor .iq-fab-ring { animation: none; display: none; }
+
+/* Mientras se arrastra: se levanta y no hay transición de posición
+   (con transición el botón "persigue" al dedo). */
+.iq-fab-mov {
+  transition: none !important;
+  transform: scale(1.06);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .28);
+  cursor: grabbing;
+  opacity: .96;
+}
+.iq-fab-mov .iq-fab-ring { display: none; }
+.iq-fab-mov:hover { transform: scale(1.06); }
+
+@media (prefers-reduced-motion: reduce) {
+  .iq-fab, .iq-fab:hover, .iq-fab:active { transition: none; transform: none; }
+  .iq-fab-ring { animation: none; display: none; }
+}
+/* En móvil angosto queda solo el icono, para no tapar las tarjetas */
+@media (max-width: 420px) {
+  .iq-fab-tx { display: none; }
+  .iq-fab { padding: 9px; }
+}
+
+/* ---------- Hoja ---------- */
+.iq-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.iq-fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 14, 28, .48);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.iq-wrap.iq-on .iq-fondo { opacity: 1; }
+
+.iq-hoja {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--sh-2);
+  transform: translateY(14px);
+  opacity: 0;
+  transition: transform .24s cubic-bezier(.2, .8, .3, 1), opacity .18s ease;
+}
+.iq-wrap.iq-on .iq-hoja { transform: translateY(0); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .iq-fondo, .iq-hoja { transition: none; }
+  .iq-hoja { transform: none; opacity: 1; }
+}
+
+.iq-h {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.iq-h-ic {
+  display: grid;
+  place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 12px;
+  background: var(--brand-050);
+  color: var(--brand);
+  flex: 0 0 auto;
+}
+.iq-h-tx { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.iq-h-tx b { font-family: var(--font-display), var(--font-body); font-size: 15px; }
+.iq-h-tx small { color: var(--muted); font-size: 12px; }
+.iq-x {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.iq-x:hover { background: var(--bg); color: var(--ink); }
+
+.iq-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Mensajes ---------- */
+.iq-msg {
+  max-width: 92%;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  font-size: 14.5px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.iq-msg p { margin: 0 0 8px; }
+.iq-msg p:last-child { margin-bottom: 0; }
+.iq-msg ul { margin: 4px 0 8px; padding-left: 18px; }
+.iq-msg li { margin: 3px 0; }
+.iq-msg b { font-weight: 700; }
+
+.iq-bot {
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.iq-yo {
+  align-self: flex-end;
+  background: var(--brand);
+  color: #fff;
+  border: 1px solid var(--brand);
+  white-space: pre-wrap;
+}
+.iq-err {
+  align-self: stretch;
+  max-width: 100%;
+  background: transparent;
+  border: 1px dashed var(--danger);
+  color: var(--danger);
+  font-size: 13.5px;
+}
+.iq-muted { color: var(--muted); }
+
+/* Texto mientras se está "escribiendo": se muestra plano y respeta
+   los saltos de línea; al terminar se cambia por el HTML final. */
+.iq-tx.iq-escribiendo {
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+.iq-tx.iq-escribiendo::after {
+  content: '▌';
+  color: var(--brand);
+  animation: iq-cursor 1s steps(2) infinite;
+}
+@keyframes iq-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .iq-tx.iq-escribiendo::after { animation: none; }
+}
+
+/* ---------- Personas con WhatsApp ---------- */
+.iq-personas {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.iq-per {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.iq-per-n { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iq-per-wa {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px; height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: #25D366;
+  cursor: pointer;
+}
+.iq-per-wa:active { transform: scale(.94); }
+
+/* ---------- Acciones bajo la respuesta ---------- */
+.iq-acts {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.iq-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.iq-act:hover:not(:disabled) { color: var(--brand); border-color: var(--brand); }
+.iq-act:disabled { opacity: .55; cursor: default; }
+.iq-act svg { flex: 0 0 auto; }
+
+.iq-voz.on {
+  color: var(--brand);
+  border-color: var(--brand);
+  animation: iq-voz-late 1.5s ease-in-out infinite;
+}
+@keyframes iq-voz-late {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--brand-rgb), .30); }
+  60%      { box-shadow: 0 0 0 5px rgba(var(--brand-rgb), 0); }
+}
+@media (prefers-reduced-motion: reduce) { .iq-voz.on { animation: none; } }
+
+/* ---------- Cargando / escribiendo ---------- */
+.iq-cargando { display: flex; align-items: center; gap: 10px; }
+.iq-carga-tx { color: var(--muted); font-size: 13.5px; }
+.iq-pts { display: inline-flex; gap: 4px; }
+.iq-pts i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  opacity: .35;
+  animation: iq-punto 1.05s ease-in-out infinite;
+}
+.iq-pts i:nth-child(2) { animation-delay: .16s; }
+.iq-pts i:nth-child(3) { animation-delay: .32s; }
+@keyframes iq-punto {
+  0%, 100% { opacity: .3; transform: translateY(0); }
+  50%      { opacity: 1;  transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) { .iq-pts i { animation: none; opacity: .6; } }
+
+/* ---------- Línea de ayuda ---------- */
+.iq-hint {
+  margin: 2px 2px 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md, 12px);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* ---------- Pie: los botones de consulta ---------- */
+.iq-pie {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.iq-pie::-webkit-scrollbar { height: 4px; }
+.iq-pie::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+.iq-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.iq-chip:hover { border-color: var(--brand); color: var(--brand); }
+.iq-chip:active { transform: scale(.97); }
+.iq-chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* En PC la hoja se centra y despega del borde */
+@media (min-width: 720px) {
+  .iq-wrap { align-items: center; }
+  .iq-hoja {
+    max-height: 82vh;
+    border: 1px solid var(--line);
+    border-radius: var(--r-xl);
+  }
+  .iq-pie { border-radius: 0 0 var(--r-xl) var(--r-xl); flex-wrap: wrap; overflow-x: visible; }
+}

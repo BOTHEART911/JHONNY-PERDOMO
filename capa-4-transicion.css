@@ -1,0 +1,47 @@
+/* ============================================================================
+ * CAPA 4 · TRANSICIÓN LATERAL ENTRE PANTALLAS — estilo iOS  (parte CSS)
+ * ----------------------------------------------------------------------------
+ * QUÉ HACE
+ *   La pantalla nueva entra deslizándose desde la derecha; cuando vuelves
+ *   atrás, entra desde la izquierda.
+ *
+ * INSTALACIÓN (una sola línea, en el <head>, DESPUÉS de style.css)
+ *   <link rel="stylesheet" href="capa-4-transicion.css" />
+ *
+ * PAREJA
+ *   capa-4-transicion.js  (obligatoria: sin ella este CSS no hace nada)
+ *
+ * NOTAS
+ *   · Anima el contenedor #app completo. No toca el splash, el girador global
+ *     (#ios-loader) ni las hojas/modales de #layer.
+ *   · Mientras dura la animación se recorta el desborde horizontal para que no
+ *     aparezca barra de scroll lateral; al terminar, se quita.
+ *   · Se apaga con "reducir movimiento" (lo controla el JS de la pareja).
+ * ========================================================================== */
+
+/* Recorte temporal del desborde lateral, solo mientras se anima */
+html.nt-tx-anim,
+html.nt-tx-anim body {
+  overflow-x: hidden;
+}
+
+#app.nt-view-in {
+  animation: nt4-in-right .26s cubic-bezier(.32, .72, 0, 1) both;
+}
+#app.nt-view-back {
+  animation: nt4-in-left .26s cubic-bezier(.32, .72, 0, 1) both;
+}
+
+@keyframes nt4-in-right {
+  from { transform: translateX(22%); opacity: .35; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+@keyframes nt4-in-left {
+  from { transform: translateX(-22%); opacity: .35; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app.nt-view-in,
+  #app.nt-view-back { animation: none; }
+}

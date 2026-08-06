@@ -1,0 +1,84 @@
+/* ============================================================================
+ * CAPA 5 · ESQUELETOS DE CARGA  (parte CSS)
+ * ----------------------------------------------------------------------------
+ * QUÉ HACE
+ *   Dibuja las siluetas grises con brillo que reemplazan al girador de las
+ *   LISTAS mientras llegan los datos.
+ *
+ * INSTALACIÓN (una sola línea, en el <head>, DESPUÉS de style.css)
+ *   <link rel="stylesheet" href="capa-5-esqueletos.css" />
+ *
+ * PAREJA
+ *   capa-5-esqueletos.js  (obligatoria: sin ella no se pinta ningún esqueleto)
+ *
+ * NOTAS
+ *   · Autónomo: no depende de ninguna clase de style.css (usa las variables de
+ *     color si existen, con respaldo propio si no).
+ *   · NO toca el girador global #ios-loader (guardar/cobrar/login) ni el
+ *     spinner que `saving()` mete dentro de los botones.
+ *   · Con "reducir movimiento" el brillo se apaga y quedan bloques grises fijos.
+ * ========================================================================== */
+
+.nt-sk-wrap { display: block; }
+
+.nt-sk-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, #E3E9F2);
+  border-radius: var(--r-lg, 22px);
+  box-shadow: var(--sh-1, 0 1px 2px rgba(16, 36, 30, .06));
+  padding: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+/* Bloque gris con brillo */
+.nt-sk {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg,
+              var(--line, #E3E9F2) 25%, #F1F5FA 37%, var(--line, #E3E9F2) 63%);
+  background-size: 400% 100%;
+  animation: nt5-brillo 1.3s ease infinite;
+}
+@keyframes nt5-brillo {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Piezas */
+.nt-sk-top   { display: flex; align-items: center; gap: 12px; }
+.nt-sk-av    { width: 44px; height: 44px; border-radius: 50%; flex: none; }
+.nt-sk-id    { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.nt-sk-l     { height: 12px; }
+.nt-sk-l.tit { height: 15px; border-radius: 7px; }
+.nt-sk-w90   { width: 90%; }
+.nt-sk-w75   { width: 75%; }
+.nt-sk-w60   { width: 60%; }
+.nt-sk-w45   { width: 45%; }
+.nt-sk-w30   { width: 30%; }
+.nt-sk-rows  { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.nt-sk-badges{ display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.nt-sk-badge { height: 24px; width: 108px; border-radius: 999px; }
+.nt-sk-acts  { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.nt-sk-btn   { height: 40px; flex: 1 1 84px; border-radius: 12px; }
+.nt-sk-ico   { height: 34px; width: 34px; border-radius: 10px; }
+.nt-sk-media { height: 150px; border-radius: 14px; margin-top: 12px; }
+
+/* Escalonado suave de la aparición de las propias siluetas */
+.nt-sk-card { animation: nt5-entra .3s ease both; }
+.nt-sk-card:nth-child(2) { animation-delay: 60ms; }
+.nt-sk-card:nth-child(3) { animation-delay: 120ms; }
+.nt-sk-card:nth-child(4) { animation-delay: 180ms; }
+.nt-sk-card:nth-child(5) { animation-delay: 240ms; }
+@keyframes nt5-entra {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-sk {
+    animation: none;
+    background: var(--line, #E3E9F2);
+  }
+  .nt-sk-card { animation: none; }
+}
