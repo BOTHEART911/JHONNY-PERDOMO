@@ -16,8 +16,8 @@
  *     apertura, sin recargas dobles. Las cachés viejas de esta app se borran.
  *  Lo externo (backend, Firebase, Google, CDN de terceros) nunca pasa por aquí.
  * ============================================================================ */
-try { importScripts('./marca.js'); } catch (e) {}
-try { importScripts('./storage-ns.js'); } catch (e) {}
+try { importScripts('./js/marca.js'); } catch (e) {}
+try { importScripts('./js/storage-ns.js'); } catch (e) {}
 const NS_SW = (self.STORAGE_NS || 'jp');
 const CACHE_PREFIJO = NS_SW + '-pub-';
 const META = CACHE_PREFIJO + 'meta';
@@ -44,7 +44,7 @@ async function versionDeRed() {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), T_VERSION);
   try {
-    const r = await fetch('./version.js?sw=' + Date.now(), { cache: 'no-store', signal: ctrl.signal });
+    const r = await fetch('./js/version.js?sw=' + Date.now(), { cache: 'no-store', signal: ctrl.signal });
     if (!r.ok) return null;
     const raw = await r.text();
     const m = raw.match(/version['"]?\s*[:=]\s*['"]([^'"]+)['"]/i) || raw.match(/(\d{4}\.\d{2}\.\d{2}\.\d+)/);

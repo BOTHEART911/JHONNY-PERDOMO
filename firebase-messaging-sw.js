@@ -10,8 +10,8 @@
  * ============================================================ */
 /* FASE 0 · prefijo de campaña: sin él, la notificación de una campaña
    reemplaza la de la otra en el mismo dispositivo (mismo origen). */
-try { importScripts('./marca.js'); } catch (e) {}
-try { importScripts('./storage-ns.js'); } catch (e) {}
+try { importScripts('./js/marca.js'); } catch (e) {}
+try { importScripts('./js/storage-ns.js'); } catch (e) {}
 const NS_FB = (self.STORAGE_NS || 'jp');
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');

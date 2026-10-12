@@ -172,7 +172,7 @@ function paintVersion(v) { $$('.app-version-line').forEach(el => el.textContent 
 async function checkVersion() {
   if (__verInFlight) return; __verInFlight = true;
   try {
-    const r = await fetch('./version.js?t=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch('./js/version.js?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
     const raw = await r.text();
     const m = raw.match(/version['"]?\s*[:=]\s*['"]([^'"]+)['"]/i) || raw.match(/(\d{4}\.\d{2}\.\d{2}\.\d+|\d+\.\d+(?:\.\d+)?)/);
