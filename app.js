@@ -68,18 +68,20 @@ function zoomImagen(src) {
 let _apiActivas = 0;
 function loaderOn() { _apiActivas++; const b = document.getElementById('ios-loader'); if (b) b.classList.add('active'); }
 function loaderOff() { _apiActivas = Math.max(0, _apiActivas - 1); if (_apiActivas === 0) { const b = document.getElementById('ios-loader'); if (b) b.classList.remove('active'); } }
+/* 12/10/2026 · Fase 1: el viaje lo hace red.js (pieza común del ecosistema):
+   rid en escrituras, corte al cambiar de vista, cola de fondo, reintento
+   seguro (solo red caída o eco de Google, y en escrituras solo con el mismo
+   rid) y versión del backend. Una lectura cortada no resuelve nunca: el
+   código de la vista vieja simplemente no sigue. */
 async function api(action, params = {}, method = 'GET', body = null) {
   if (API_URL.startsWith('PEGA_AQUI')) { toast('Falta configurar la URL del backend', 'err'); throw new Error('API_URL sin configurar'); }
-  const qs = new URLSearchParams(Object.assign({ action }, params)).toString();
-  const opts = { method };
-  if (method === 'POST') { opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' }; opts.body = JSON.stringify(body || {}); }
   loaderOn();
-  try {
-    const res = await fetch(`${API_URL}?${qs}`, opts);
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Error del servidor');
-    return json.data;
-  } finally { loaderOff(); }
+  let json;
+  try { json = await RED.pedir(API_URL, action, params, { metodo: method, cuerpo: method === 'POST' ? (body || {}) : null }); }
+  catch (e) { loaderOff(); if (e && e.cortado) return new Promise(() => {}); throw e; }
+  loaderOff();
+  if (!json.ok) throw new Error(json.error || 'Error del servidor');
+  return json.data;
 }
 
 /* Igual que api(), pero SIN el loader de pantalla. Es para el refresco EN
@@ -87,9 +89,9 @@ async function api(action, params = {}, method = 'GET', body = null) {
    si el spinner parpadeara en cada aviso la vista se sentiría rota.
    22/07/2026 */
 async function apiSilencio(action, params = {}) {
-  const qs = new URLSearchParams(Object.assign({ action }, params)).toString();
-  const res = await fetch(`${API_URL}?${qs}`);
-  const json = await res.json();
+  let json;
+  try { json = await RED.pedir(API_URL, action, params, { fondo: RED.esLectura(action) }); }
+  catch (e) { if (e && e.cortado) return new Promise(() => {}); throw e; }
   if (!json.ok) throw new Error(json.error || 'Error del servidor');
   return json.data;
 }
@@ -309,6 +311,7 @@ const RUTAS_ANCHAS = new Set(['', 'home', 'ideas', 'casa', 'emergencia', 'comerc
 function appWide(on) { document.body.classList.toggle('wide', !!on); }
 window.addEventListener('hashchange', render);
 function render() {
+  RED.nuevaVista();   /* 12/10/2026 · corta lecturas de la vista que se va */
   const route = (location.hash.replace(/^#\//, '') || '').split('?')[0];
   const user = getActive();
   appWide(!!user && RUTAS_ANCHAS.has(route));   // 23/07: se decide con la ruta de destino (ver RUTAS_ANCHAS)
