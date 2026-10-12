@@ -1787,16 +1787,26 @@ function lrVivoStart(user) {
   lrVivoStop();                   // o el primer aviso repintaría de gratis
   LRV.on = true; LRV.user = user; LRV.primer = true; LRV.sig = firma;
   window.__lrTeardown = lrVivoStop;
-  /* A) señal instantánea */
+  /* A) señal instantánea
+     13/10/2026 · Fase 2: /meta ya es legible, así que la señal manda y NO
+     hay reloj de 20 s. El sondeo (B) arranca SOLO si Firebase no carga,
+     niega la lectura o no entrega su primer valor en 6 s. */
+  let llego = false;
+  const t0 = setTimeout(() => { if (!llego && LRV.on) lrVivoRespaldo(user); }, 6000);
   ntLoadFirebase(false).then(fb => {
     if (!LRV.on) return;
     LRV.ref = fb.database().ref('meta/bd_rev');
     LRV.cb = LRV.ref.on('value', () => {
+      llego = true; clearTimeout(t0);
       if (LRV.primer) { LRV.primer = false; return; }   // el primer valor es el estado actual
       lrVivoTocar();
-    }, () => {});
-  }).catch(() => {});
-  /* B) respaldo por sondeo */
+    }, () => { clearTimeout(t0); if (LRV.on) lrVivoRespaldo(user); });
+  }).catch(() => { clearTimeout(t0); if (LRV.on) lrVivoRespaldo(user); });
+}
+
+/* B) respaldo por sondeo (solo si la señal de Firebase no está) */
+function lrVivoRespaldo(user) {
+  if (LRV.poll) return;
   LRV.poll = setInterval(() => {
     if (!lrVivoVivo()) return;
     apiSilencio('pub.rev', { documento: user.documento })
