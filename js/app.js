@@ -169,6 +169,19 @@ function updateInstallSection(esperar) {
    ============================================================ */
 let APP_VERSION_LOADED = '', __verInFlight = false;
 function paintVersion(v) { $$('.app-version-line').forEach(el => el.textContent = 'Versión ' + v); }
+/* 12/10/2026 · ENTRADA INSTANTÁNEA — la app abre desde la caché de su versión
+   y version.js se revisa en paralelo. Si cambió: se le avisa al service worker
+   (cambia de caché) y se hace UNA sola recarga (candado por versión en la
+   sesión, así nunca queda en bucle). Sin SW activo, se limpian las cachés. */
+async function recargarVersion(v) {
+  try { const k = nsKey('jp_recarga_' + v); if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) {}
+  try {
+    const c = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (c) await new Promise(res => { const ch = new MessageChannel(); ch.port1.onmessage = () => res(); c.postMessage({ tipo: 'version', v: v }, [ch.port2]); setTimeout(res, 1500); });
+    else { const ks = await caches.keys(); await Promise.all(ks.filter(nsCacheMia).map(k => caches.delete(k))); }
+  } catch (e) {}
+  location.reload();
+}
 async function checkVersion() {
   if (__verInFlight) return; __verInFlight = true;
   try {
@@ -179,7 +192,7 @@ async function checkVersion() {
     const v = m ? String(m[1]).trim() : '';
     if (!v) return;
     if (!APP_VERSION_LOADED) { APP_VERSION_LOADED = v; paintVersion(v); return; }
-    if (v !== APP_VERSION_LOADED) { try { const ks = await caches.keys(); await Promise.all(ks.filter(nsCacheMia).map(k => caches.delete(k))); } catch {} location.reload(); }
+    if (v !== APP_VERSION_LOADED) return recargarVersion(v);
   } finally { __verInFlight = false; }
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
