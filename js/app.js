@@ -73,14 +73,43 @@ function loaderOff() { _apiActivas = Math.max(0, _apiActivas - 1); if (_apiActiv
    seguro (solo red caída o eco de Google, y en escrituras solo con el mismo
    rid) y versión del backend. Una lectura cortada no resuelve nunca: el
    código de la vista vieja simplemente no sigue. */
+/* 12/10/2026 · Fase 4
+   · ZONA DE LÍDERES: las rutas del líder viajan con su pase firmado (tkl), que
+     entrega pub.liderEntrar. El CORE usa la cédula DEL PASE, no la de la URL.
+   · dev: huella de este navegador en las escrituras de referidos, para que la
+     señal EN VIVO de mi propio guardado no me haga volver a pedir la lista.
+   · Las LECTURAS muestran el indicador pero NO levantan el escudo de la capa
+     12: leer nunca bloquea la navegación. Las escrituras sí (botón ocupado +
+     escudo desde el primer toque). */
+const LZ_ZONA = new Set(('pub.rev pub.liderAsignar pub.liderReferidos pub.liderMarcar pub.liderEditarRef pub.lideresLista ' +
+  'pub.liderCeder pub.liderNuevoRef pub.liderCompromisos pub.liderComTraza pub.liderSolicitudes pub.liderSolTraza ' +
+  'pub.liderInsights pub.padrinoEntrar pub.liderBalances pub.liderBalanceVer pub.liderBalancePdf pub.liderBalanceXlsx ' +
+  'pub.liderServicios pub.servResponder pub.servEliminar pub.servEnviarResp pub.servExcel pub.servAgregar ' +
+  'pub.servNuevaSolicitud pub.esProfesional').split(' '));
+const LZ_CON_DEV = new Set(['pub.liderMarcar', 'pub.liderEditarRef', 'pub.liderNuevoRef', 'pub.liderAsignar', 'pub.liderCeder']);
+const DEV_ID = (() => { try { let d = localStorage.getItem(nsKey('jp_dev')); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem(nsKey('jp_dev'), d); } return d; } catch { return ''; } })();
+function conPase(action, params, body, method) {
+  const extra = {};
+  if (LZ_ZONA.has(action) && LIDER && LIDER.tkl) extra.tkl = LIDER.tkl;
+  if (LZ_CON_DEV.has(action) && DEV_ID) extra.dev = DEV_ID;
+  if (!Object.keys(extra).length) return [params, body];
+  if (method === 'POST') return [params, Object.assign({}, body || {}, extra)];
+  return [Object.assign({}, params || {}, extra), body];
+}
+let _leeActivas = 0;
+function leeOn() { _leeActivas++; const b = document.getElementById('ios-loader'); if (b) b.classList.add('active'); }
+function leeOff() { _leeActivas = Math.max(0, _leeActivas - 1); if (_leeActivas === 0 && _apiActivas === 0) { const b = document.getElementById('ios-loader'); if (b) b.classList.remove('active'); } }
 async function api(action, params = {}, method = 'GET', body = null) {
   if (API_URL.startsWith('PEGA_AQUI')) { toast('Falta configurar la URL del backend', 'err'); throw new Error('API_URL sin configurar'); }
-  loaderOn();
+  const lectura = RED.esLectura(action);
+  [params, body] = conPase(action, params, body, method);
+  const on = lectura ? leeOn : loaderOn, off = lectura ? leeOff : loaderOff;
+  on();
   let json;
   try { json = await RED.pedir(API_URL, action, params, { metodo: method, cuerpo: method === 'POST' ? (body || {}) : null }); }
-  catch (e) { loaderOff(); if (e && e.cortado) return new Promise(() => {}); throw e; }
-  loaderOff();
-  if (!json.ok) throw new Error(json.error || 'Error del servidor');
+  catch (e) { off(); if (e && e.cortado) return new Promise(() => {}); throw e; }
+  off();
+  if (!json.ok) { if (json.error === 'SESION_LIDER_VENCIDA') liderVencida(); throw new Error(json.error || 'Error del servidor'); }
   return json.data;
 }
 
@@ -89,12 +118,28 @@ async function api(action, params = {}, method = 'GET', body = null) {
    si el spinner parpadeara en cada aviso la vista se sentiría rota.
    22/07/2026 */
 async function apiSilencio(action, params = {}) {
+  [params] = conPase(action, params, null, 'GET');
   let json;
   try { json = await RED.pedir(API_URL, action, params, { fondo: RED.esLectura(action) }); }
   catch (e) { if (e && e.cortado) return new Promise(() => {}); throw e; }
-  if (!json.ok) throw new Error(json.error || 'Error del servidor');
+  if (!json.ok) { if (json.error === 'SESION_LIDER_VENCIDA') liderVencida(); throw new Error(json.error || 'Error del servidor'); }
   return json.data;
 }
+
+/* El paquete público (publico.js) pide al CORE por aquí: en segundo plano,
+   sin loader y sin cortarse al cambiar de vista. */
+/* Lectura de fondo que NO se descarta al cambiar de vista (revalidaciones que
+   alimentan caché: paquete público, ¿es líder?). */
+async function apiFondo(action, params = {}) {
+  [params] = conPase(action, params, null, 'GET');
+  const j = await RED.pedir(API_URL, action, params || {}, { fondo: true, persistente: true });
+  if (!j || !j.ok) throw new Error((j && j.error) || 'Error del servidor');
+  return j.data;
+}
+PUB.pedidor(apiFondo);
+/* La sesión que despacha cada llamada: si al volver la respuesta la cuenta
+   activa ya es otra, se descarta (una sesión vieja nunca pisa la nueva). */
+RED.sesion(() => { try { const d = localStorage.getItem(ACT_KEY); return d ? { id: d } : null; } catch { return null; } });
 
 /* ---------- Sesiones en el dispositivo ---------- */
 const SS_KEY = nsKey('jp_sessions'), ACT_KEY = nsKey('jp_active');
@@ -106,7 +151,34 @@ const getActive = () => { const d = localStorage.getItem(ACT_KEY); return getSes
 const setActive = (doc) => localStorage.setItem(ACT_KEY, doc);
 /* Quita una cuenta guardada del dispositivo y devuelve las que quedan (22/07) */
 function removeSession(doc) { const list = getSessions().filter(x => String(x.documento) !== String(doc)); localStorage.setItem(SS_KEY, JSON.stringify(list)); return list; }
-function logout() { LIDER = null; try { localStorage.removeItem(LIDER_REMEMBER_KEY); } catch {} localStorage.removeItem(ACT_KEY); go('login'); }
+function logout() { LIDER = null; liderSesBorrar(); try { localStorage.removeItem(LIDER_REMEMBER_KEY); } catch {} localStorage.removeItem(ACT_KEY); go('login'); }
+
+/* 12/10/2026 · Fase 4 · SESIÓN DE LÍDER. Antes "Recordar mi contraseña"
+   guardaba la CLAVE en el teléfono, en texto plano, y cada entrada repetía
+   esLider + liderEntrar (dos viajes de 3 s). Ahora se guarda el PASE firmado
+   que da el CORE (30 días; se anula solo si el líder cambia la contraseña):
+   la zona abre al instante y la clave nunca queda escrita en el teléfono. */
+const LIDER_SES_KEY = nsKey('jp_lider_ses');
+function liderSesGuardar(L, recordar) {
+  if (!L || !L.tkl) return;
+  const s = JSON.stringify({ documento: L.documento, codigo: L.codigo, nombre: L.nombre, correo: L.correo, opciones: L.opciones, tkl: L.tkl });
+  try { (recordar ? localStorage : sessionStorage).setItem(LIDER_SES_KEY, s); (recordar ? sessionStorage : localStorage).removeItem(LIDER_SES_KEY); } catch {}
+}
+function liderSesLeer(doc) {
+  for (const st of [sessionStorage, localStorage]) {
+    try { const o = JSON.parse(st.getItem(LIDER_SES_KEY) || 'null'); if (o && o.tkl && String(o.documento) === String(doc)) return o; } catch {}
+  }
+  return null;
+}
+function liderSesBorrar() { try { localStorage.removeItem(LIDER_SES_KEY); sessionStorage.removeItem(LIDER_SES_KEY); } catch {} }
+/* El CORE dijo que el pase ya no sirve (venció o cambió la clave) */
+let _lzAvisado = false;
+function liderVencida() {
+  LIDER = null; liderSesBorrar(); lrVivoStop();
+  if (_lzAvisado) return; _lzAvisado = true; setTimeout(() => { _lzAvisado = false; }, 4000);
+  toast('Tu sesión de líder venció. Vuelve a entrar con tu contraseña.', 'err');
+  const u = getActive(); if (u) setTimeout(() => viewLideres(u), 50);
+}
 
 /* ============================================================
    PWA: INSTALACIÓN  (patrón SEP-GROUP)
@@ -235,8 +307,8 @@ function footBrand() { return `<img class="brand-banner" src="${APP_BANNER}" alt
 
 /* Catálogos (con caché) */
 let _resiCache = null, _serviCache = null;
-async function getResidencias() { if (!_resiCache) _resiCache = await api('pub.residencias'); return _resiCache; }
-async function getServicios() { if (!_serviCache) _serviCache = await api('pub.servicios'); return _serviCache; }
+async function getResidencias() { if (!_resiCache) _resiCache = await PUB.o('residencias', () => api('pub.residencias')); return _resiCache; }
+async function getServicios() { if (!_serviCache) _serviCache = await PUB.o('servicios', () => api('pub.servicios')); return _serviCache; }
 
 /* Confirmación */
 function crow(label, v) { return `<div class="crow"><span>${esc(label)}</span><b>${esc(v || '—')}</b></div>`; }
@@ -594,11 +666,16 @@ async function viewIdeas(user) {
    esa llamada antes de pintar, y mientras tanto la vista anterior seguia en
    pantalla: era la otra mitad del "atras en dos pasos". La primera vez se espera
    igual que antes; de ahi en adelante Inicio pinta de una y se revalida callado. */
-let ES_LIDER = { doc: '', val: null };
+/* 12/10/2026 · Fase 4: el valor se guarda en el teléfono, así Inicio pinta
+   sus botones al instante también en la primera vista de cada apertura. */
+const ES_LIDER_KEY = nsKey('jp_eslider');
+let ES_LIDER = (() => { try { const o = JSON.parse(localStorage.getItem(ES_LIDER_KEY) || 'null'); if (o && o.doc) return { doc: o.doc, val: !!o.val }; } catch {} return { doc: '', val: null }; })();
+let ES_LIDER_REV = '';   // una revalidación por sesión y cuenta
 async function esLiderCargar(user) {
   try {
-    const el = await api('pub.esLider', { documento: user.documento });
+    const el = await apiFondo('pub.esLider', { documento: user.documento });
     ES_LIDER = { doc: user.documento, val: !!(el && el.esLider) };
+    try { localStorage.setItem(ES_LIDER_KEY, JSON.stringify(ES_LIDER)); } catch {}
   } catch {
     if (ES_LIDER.doc !== user.documento) ES_LIDER = { doc: user.documento, val: false };
   }
@@ -610,7 +687,7 @@ async function viewHome(user) {
   // Sección de líderes (y Refiere, que es solo para líderes) se muestran solo
   // si el usuario está en la hoja LIDERES.
   const cacheLider = esLiderCache(user);
-  const esLider = cacheLider === null ? await esLiderCargar(user) : cacheLider;
+  const esLider = cacheLider === true;   // sin dato todavía: se pinta sin la baldosa y se suma al llegar
   const soloLider = new Set(['lideres']);
   const menu = MENU.filter(m => !soloLider.has(m.id) || esLider);
 
@@ -619,12 +696,12 @@ async function viewHome(user) {
   app.querySelectorAll('.tile').forEach(t => t.onclick = () => openMenu(t.dataset.id, user));
   /* Se pinto con el valor guardado: se confirma en silencio y solo se repinta si
      de verdad cambio (dejo de ser lider o acaba de serlo) y seguimos en Inicio. */
-  if (cacheLider !== null) esLiderCargar(user).then(v => {
+  if (ES_LIDER_REV !== user.documento) { ES_LIDER_REV = user.documento; esLiderCargar(user).then(v => {
     const enInicio = ['', '#/', '#/home'].indexOf(location.hash) >= 0;
-    if (v !== cacheLider && enInicio) viewHome(user);
-  }).catch(() => {});
+    if (v !== esLider && enInicio && !layer.children.length) viewHome(user);
+  }).catch(() => {}); }
   try {
-    const d = await api('pub.inicio'); const cont = $('#inicio');
+    const d = PUB.dato('inicio') || await PUB.o('inicio', () => api('pub.inicio')); const cont = $('#inicio');
     if (!cont) return; // el usuario ya cambió de vista mientras cargaba: no toques el DOM
     const media = d.imagen ? `<img class="hero-img" src="${esc(d.imagen)}" alt="${esc(MV.candidato)}" onerror="this.replaceWith(heroFallback())" />` : heroFallback().outerHTML;
     const play = d.reel ? `<button class="hero-play-c" id="playReel" aria-label="Ver video">${I.play}</button>` : '';
@@ -730,6 +807,10 @@ const FOTO_DEFAULT = 'https://botheart911.github.io/IMAGENES-JHONNY/marca/user.p
 async function viewLideres(user) {
   // Si ya validó la contraseña en esta sesión, va directo al panel.
   if (LIDER && LIDER.documento === user.documento) return liderPanel(user);
+  /* 12/10/2026 · Fase 4: con el pase guardado en el teléfono se entra sin
+     viajar al servidor. Si el CORE lo rechaza, liderVencida() lo devuelve aquí. */
+  const ses = liderSesLeer(user.documento);
+  if (ses) { LIDER = ses; return liderPanel(user); }
 
   /* 31/07 · seguridad: antes de pintar el login preguntamos el estado real
      de la cuenta (si tiene correo y si la zona está bloqueada). */
@@ -757,9 +838,11 @@ async function viewLideres(user) {
 /* Login de la zona (solo contraseña). Se separó de viewLideres para poder
    repintarlo al vencer un bloqueo sin repetir la consulta de estado. */
 function liderLoginPintar(user) {
-  // Clave recordada (si el usuario marcó "recordar")
+  /* 12/10/2026 · Fase 4: la contraseña ya no se guarda en el teléfono (se
+     borra la que hubiera quedado de antes). Se recuerda la SESIÓN. */
   let recordada = '';
   try { const raw = localStorage.getItem(LIDER_REMEMBER_KEY); if (raw) { const o = JSON.parse(raw); if (o && o.doc === user.documento) recordada = o.clave || ''; } } catch {}
+  const recordarMarcado = !!recordada || !!localStorage.getItem(nsKey('jp_lider_recordar'));
 
   app.innerHTML = `${backbar('Zona de líderes')}<div class="pad stack">
     <div class="card pad stack center">
@@ -768,10 +851,10 @@ function liderLoginPintar(user) {
       <p class="muted">Este apartado es de uso exclusivo de los líderes. Ingresa tu contraseña para administrar tus referidos.</p>
       <label class="field" style="text-align:left;"><span>Contraseña</span>
         <div class="input-pass">
-          <input class="input" id="lg-clave" type="password" placeholder="Tu contraseña" autocomplete="off" value="${esc(recordada)}" />
+          <input class="input" id="lg-clave" type="password" placeholder="Tu contraseña" autocomplete="current-password" value="${esc(recordada)}" />
           <button type="button" class="pass-eye" id="lg-eye" aria-label="Mostrar u ocultar">${I.eyeOff}</button>
         </div></label>
-      <label class="check-row"><input type="checkbox" id="lg-recordar" ${recordada ? 'checked' : ''} /> <span>Recordar mi contraseña</span></label>
+      <label class="check-row"><input type="checkbox" id="lg-recordar" ${recordarMarcado ? 'checked' : ''} /> <span>Mantener mi sesión en este teléfono</span></label>
       <button class="btn btn-primary btn-block" id="lg-entrar">Entrar</button>
       <button class="link-quiet" id="lg-olvide">📧 Olvidé mi contraseña</button>
     </div>
@@ -795,12 +878,14 @@ function liderLoginPintar(user) {
         if (r.requiereCrearClave) return liderCrearClave(user);
         return toast(r.msg || 'No se pudo entrar', 'err');
       }
-      // recordar / olvidar
+      // 12/10/2026 · Fase 4: se recuerda la sesión (pase firmado), nunca la clave
+      const recordar = $('#lg-recordar').checked;
       try {
-        if ($('#lg-recordar').checked) localStorage.setItem(LIDER_REMEMBER_KEY, JSON.stringify({ doc: user.documento, clave }));
-        else localStorage.removeItem(LIDER_REMEMBER_KEY);
+        localStorage.removeItem(LIDER_REMEMBER_KEY);
+        if (recordar) localStorage.setItem(nsKey('jp_lider_recordar'), '1'); else localStorage.removeItem(nsKey('jp_lider_recordar'));
       } catch {}
-      LIDER = { codigo: r.lider.codigo, nombre: r.lider.nombre, documento: user.documento, correo: r.lider.correo || '', opciones: r.opciones };
+      LIDER = { codigo: r.lider.codigo, nombre: r.lider.nombre, documento: user.documento, correo: r.lider.correo || '', opciones: r.opciones, tkl: r.tkl || '' };
+      liderSesGuardar(LIDER, recordar);
       liderPanel(user);
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
@@ -993,7 +1078,8 @@ function liderCrearClave(user) {
       const e2 = await api('pub.liderEntrar', {}, 'POST', { documento: user.documento, clave: a });
       saving(btn, false);
       if (!e2.ok) return toast(e2.msg || 'Creada, vuelve a entrar', 'err');
-      LIDER = { codigo: e2.lider.codigo, nombre: e2.lider.nombre, documento: user.documento, correo: e2.lider.correo || '', opciones: e2.opciones };
+      LIDER = { codigo: e2.lider.codigo, nombre: e2.lider.nombre, documento: user.documento, correo: e2.lider.correo || '', opciones: e2.opciones, tkl: e2.tkl || '' };
+      liderSesGuardar(LIDER, false);
       toast('¡Contraseña creada!', 'ok'); liderPanel(user);
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
@@ -1025,6 +1111,7 @@ async function esProfCargar(user) {
 const esProfCache = (user) => (ES_PROF.doc === user.documento && ES_PROF.val !== null) ? ES_PROF.val : null;
 
 function liderPanel(user) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   const cache = esProfCache(user);
   liderPanelPintar(user, cache === true);
   esProfCargar(user).then(v => {
@@ -1049,6 +1136,7 @@ function liderPanelPintar(user, esProf) {
     <div class="menu-grid" id="lp-grid">${items.map(m => `<button class="tile" data-id="${m.id}"><span class="ico">${I[m.icon]}</span><span class="txt"><b>${esc(m.t)}</b><br><span>${esc(m.d)}</span></span></button>`).join('')}</div>
   </div>`;
   app.hidden = false; hideSplash(); appWide(true); $('#backbtn').onclick = () => go('home');
+  lrPrecargar(user);   /* 12/10/2026 · Fase 4: Mis referidos se trae de fondo mientras el líder mira el panel */
   app.querySelectorAll('.tile').forEach(t => t.onclick = () => {
     const id = t.dataset.id;
     if (id === 'l-referidos')   return liderReferidos(user);
@@ -1060,13 +1148,50 @@ function liderPanelPintar(user, esProf) {
 }
 
 /* ---- MIS REFERIDOS (tarjetas con Asistencia/Intención/Editar) ---- */
+/* 12/10/2026 · Fase 4 · CARGA ÚNICA POR SESIÓN (patrón BD Predial)
+   La lista viaja compacta (fmt=2) y comprimida (gz=1): 104 KB → ~19 KB. Se
+   guarda en la sesión con la hora del canal 'bd' con que se armó (rv). Al
+   volver a entrar se pinta de una con lo guardado; la señal de Firebase
+   (/meta/bd_rev) dice si hay algo más nuevo y solo entonces se pide. */
+const lrClaveCache = () => 'pub.liderReferidos:' + (LR_COMO || 'yo');
+async function lrPedir(user) {
+  const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento }, RAP.params())));
+  const d = await RAP.abrir(r);
+  if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
+  return d;
+}
+/* Lectura de fondo desde el panel: si el líder toca "Mis referidos" mientras
+   viaja, la vista hereda ese mismo viaje (red.js) en vez de pedir otro. */
+let LR_PRE = null;
+function lrPrecargar(user) {
+  RAP.setUsuario(user.documento);
+  if (LR_PRE || RAP.tomar(lrClaveCache())) return;
+  LR_PRE = (async () => {
+    try {
+      const r = await apiFondo('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento }, RAP.params())));
+      const d = await RAP.abrir(r);
+      if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
+    } catch (e) {} finally { LR_PRE = null; }
+  })();
+}
 async function liderReferidos(user) {
+  RED.nuevaVista();
   LR_MUN = ''; LR_MUNS_TODOS = false;   // 01/09: cada entrada arranca sin filtro de municipio
-  app.innerHTML = `${backLider('Mis referidos')}<div class="pad stack" id="lr-body">${loadingBox('Cargando tus referidos…')}</div>`;
+  RAP.setUsuario(user.documento);
+  const enCache = RAP.tomar(lrClaveCache()) || await RAP.revivir(lrClaveCache());
+  app.innerHTML = `${backLider('Mis referidos')}<div class="pad stack" id="lr-body">${enCache ? '' : loadingBox('Cargando tus referidos…')}</div>`;
   app.hidden = false; hideSplash(); bindBackLider(user); appWide(true);
   ensureConfig();   // ajuste 20/07: plantilla del botón Conectar
+  if (enCache && enCache.data && enCache.data.ok) {
+    const r = enCache.data;
+    LIDER.opciones = r.opciones || LIDER.opciones;
+    if (r.gestion) { LR_GESTION = r.gestion; }
+    lrPintar(user, r.referidos || []);
+    lrVivoStart(user, (enCache.rv && enCache.rv.bd) || 0);
+    return;
+  }
   try {
-    const r = await api('pub.liderReferidos', lrCtx({ documento: user.documento }));
+    const r = await lrPedir(user);
     if (!r.ok) {
       /* 31/08: si le quitaron la delegación mientras estaba adentro, se
          vuelve a su propio grupo en vez de dejarlo en una pantalla muerta. */
@@ -1076,7 +1201,7 @@ async function liderReferidos(user) {
     LIDER.opciones = r.opciones;
     if (r.gestion) { LR_GESTION = r.gestion; if (LR_COMO && r.gestion.nombre) LR_GESTION.nombre = r.gestion.nombre; }
     lrPintar(user, r.referidos);
-    lrVivoStart(user);          // 22/07: la vista queda EN VIVO
+    lrVivoStart(user, (r.rv && r.rv.bd) || 0);          // 22/07: la vista queda EN VIVO
   } catch (e) { $('#lr-body').innerHTML = `<div class="card pad center muted">Error de conexión</div>`; }
 }
 
@@ -1352,6 +1477,7 @@ async function lrBajar(accion, mes, user, btn, etiqueta) {
 }
 
 async function liderMemoria(user) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   openSheet(`<div class="grip"></div><h2 class="h2">Memoria mensual</h2>${loadingBox('Cargando tus meses…')}`);
   try {
     const r = await api('pub.liderBalances', lrCtx({ documento: user.documento }));
@@ -1441,25 +1567,49 @@ function pintarReferidos(user, referidos) {
     <button class="btn btn-primary" id="lr-nuevo" style="white-space:nowrap;">+ Nuevo referido</button>
   </div>`;
   const contador = lrFidHtml(referidos);
-  const cards = referidos.map(rf => referidoCard(rf)).join('');
-  $('#lr-body').innerHTML = `${lrBannerHtml()}${header}${contador}${lrAhijadosBtnHtml()}${lrMemoriaBtn()}<div class="lr-muns" id="lr-muns"></div><div class="ref-grid" id="lr-list">${cards}</div>`;
+  /* 12/10/2026 · Fase 4 · CABECERA ANTES QUE DATOS
+     Antes: las 489 tarjetas en un solo innerHTML + un recorrido que buscaba
+     cada referido en la lista (489 × 489) y le colgaba 8 manejadores a cada
+     tarjeta (~4.000). Medido en el banco: ~0,9 s con la pantalla congelada.
+     Ahora: cabecera y las primeras 60 tarjetas de una; el resto entra por
+     tandas sin congelar, y UN solo manejador en la lista atiende todo. */
+  const PRIMERAS = 60, TANDA = 150;
+  $('#lr-body').innerHTML = `${lrBannerHtml()}${header}${contador}${lrAhijadosBtnHtml()}${lrMemoriaBtn()}<div class="lr-muns" id="lr-muns"></div><div class="ref-grid" id="lr-list">${referidos.slice(0, PRIMERAS).map(rf => referidoCard(rf)).join('')}</div>`;
   $('#lr-nuevo').onclick = () => liderNuevoReferido(user);
   { const bm = $('#lr-memoria'); if (bm) bm.onclick = () => liderMemoria(user); }   // 01/08
   lrBindPadrino(user);
   lrPintarMuns();                     // 01/09: pastillas de municipio
   $('#lr-q').addEventListener('input', e => { lrAplicar(); });
-  $$('#lr-list .rcard').forEach(card => {
-    const doc = card.dataset.doc;
-    const rf = referidos.find(x => x.documento === doc);
-    card.querySelector('[data-act="asis"]').onclick = () => selectorMarcar(user, rf, 'ASISTENCIA', card);
-    card.querySelector('[data-act="inten"]').onclick = () => selectorMarcar(user, rf, 'INTENCION', card);
-    card.querySelector('[data-act="edit"]').onclick = () => liderEditarReferido(user, rf, () => liderReferidos(user));
-    const con = card.querySelector('[data-act="conectar"]'); if (con) con.onclick = () => window.open('https://wa.me/57' + onlyDig(rf.contacto) + '?text=' + encodeURIComponent(msgConectar(rf)), '_blank');
-    const ced = card.querySelector('[data-act="ceder"]'); if (ced) ced.onclick = () => liderCeder(user, rf);   // 22/07
-    const wa = card.querySelector('[data-act="wa"]'); if (wa) wa.onclick = () => window.open('https://wa.me/57' + onlyDig(rf.contacto), '_blank');
-    const tel = card.querySelector('[data-act="tel"]'); if (tel) tel.onclick = () => window.open('tel:' + onlyDig(rf.contacto), '_self');
-    const fto = card.querySelector('[data-act="foto"]'); if (fto) fto.onclick = () => zoomImagen(refFoto(rf));   // 25/07
+  const lista = $('#lr-list');
+  const porDoc = new Map(referidos.map(x => [String(x.documento), x]));
+  lista.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]'); if (!b || !lista.contains(b)) return;
+    const card = b.closest('.rcard'); if (!card) return;
+    const rf = porDoc.get(String(card.dataset.doc)); if (!rf) return;
+    switch (b.dataset.act) {
+      case 'asis':     return selectorMarcar(user, rf, 'ASISTENCIA', card);
+      case 'inten':    return selectorMarcar(user, rf, 'INTENCION', card);
+      case 'edit':     return liderEditarReferido(user, rf, () => lrRepintarLocal(user));
+      case 'conectar': return window.open('https://wa.me/57' + onlyDig(rf.contacto) + '?text=' + encodeURIComponent(msgConectar(rf)), '_blank');
+      case 'ceder':    return liderCeder(user, rf);   // 22/07
+      case 'wa':       return window.open('https://wa.me/57' + onlyDig(rf.contacto), '_blank');
+      case 'tel':      return window.open('tel:' + onlyDig(rf.contacto), '_self');
+      case 'foto':     return zoomImagen(refFoto(rf));   // 25/07
+    }
   });
+  /* El resto por tandas (cada una en su propio cuadro). Si la vista cambió
+     o se repintó, la tanda vieja no toca nada. */
+  const yo = lista;
+  let i = PRIMERAS;
+  const filtro = () => (($('#lr-q') && $('#lr-q').value) || LR_MUN);
+  const siguiente = () => {
+    if (!yo.isConnected || i >= referidos.length) { if (yo.isConnected && filtro()) lrAplicar(); return; }
+    yo.insertAdjacentHTML('beforeend', referidos.slice(i, i + TANDA).map(rf => referidoCard(rf)).join(''));
+    i += TANDA;
+    if (filtro()) lrAplicar();
+    setTimeout(siguiente, 0);
+  };
+  if (i < referidos.length) requestAnimationFrame(() => setTimeout(siguiente, 0));
 }
 
 /* ============================================================
@@ -1554,9 +1704,11 @@ function muniClase(m) {
 
 /* Ajuste 20/07: asegura que APP_CONFIG (plantillas/enlaces) esté cargado antes
    de usar el botón Conectar o el aviso de Líder Principal. */
+function usarConfig(c) { if (!c) return; APP_CONFIG = c; if (c.comercioUrl) COMERCIO_URL = c.comercioUrl; }
 async function ensureConfig() {
   if (APP_CONFIG && APP_CONFIG.conectar) return APP_CONFIG;
-  try { const c = await api('pub.config'); if (c) { APP_CONFIG = c; if (c.comercioUrl) COMERCIO_URL = c.comercioUrl; } } catch {}
+  /* 12/10/2026 · Fase 4: del paquete público; el CORE solo si no hay nada */
+  try { usarConfig(await PUB.o('config', () => apiFondo('pub.config'))); } catch {}
   return APP_CONFIG;
 }
 
@@ -1649,6 +1801,7 @@ function selectorMarcar(user, rf, campo, card) {
       if (!r.ok) return toast(r.msg || 'No se pudo guardar', 'err');
       // actualizar en memoria y repintar solo el badge de esta tarjeta
       if (campo === 'ASISTENCIA') rf.asistencia = valor; else rf.intencion = valor;
+      RAP.tocar(lrClaveCache());   // 12/10 · Fase 4: la fila ya está parchada en memoria; la copia local se descarta
       const badges = card.querySelector('.rc-badges');
       if (badges) badges.innerHTML = refBadgesHtml(rf);
       if (campo === 'INTENCION') lrFidRefrescar();   // 26/07: la barra se mueve al instante
@@ -1692,6 +1845,10 @@ function liderEditarReferido(user, rf, onDone) {
       const r = await api('pub.liderEditarRef', {}, 'POST', lrCtx({ documento: user.documento, refDoc: rf.documento, nombre: nom, contacto: tel, residencia: resi }));
       saving(btn, false);
       if (!r.ok) return toast(r.msg || 'No se pudo guardar', 'err');
+      /* 12/10/2026 · Fase 4: la fila se parcha en memoria (sin volver a pedir la lista) */
+      rf.nombre = r.nombre || nom.toUpperCase();
+      if (tel) rf.contacto = tel;
+      if (resi) rf.residencia = resi;
       closeLayer(); toast('Referido actualizado', 'ok'); if (onDone) onDone();
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
@@ -1752,7 +1909,9 @@ function liderCeder(user, rf, preset) {
       const r = await api('pub.liderCeder', {}, 'POST', { documento: user.documento, refDoc: rf.documento, destino: destino });
       if (!r.ok) return toast(r.msg || 'No se pudo ceder', 'err');
       toast('Cedido a ' + (r.lider || etiqueta), 'ok');
-      liderReferidos(user);
+      /* 12/10/2026 · Fase 4: sale de la lista en memoria; sin recargar */
+      const i = LR_REFS.indexOf(rf); if (i >= 0) LR_REFS.splice(i, 1);
+      lrRepintarLocal(user);
     } catch (e) { toast('Error de conexión', 'err'); }
   };
 }
@@ -1795,10 +1954,10 @@ function lrVivoVivo() {
   return true;
 }
 
-function lrVivoStart(user) {
+function lrVivoStart(user, tsLista) {
   const firma = LRV.sig;          // la deja lrPintar justo antes: no se puede perder,
   lrVivoStop();                   // o el primer aviso repintaría de gratis
-  LRV.on = true; LRV.user = user; LRV.primer = true; LRV.sig = firma;
+  LRV.on = true; LRV.user = user; LRV.primer = true; LRV.sig = firma; LRV.tsLista = Number(tsLista) || 0;
   window.__lrTeardown = lrVivoStop;
   /* A) señal instantánea
      13/10/2026 · Fase 2: /meta ya es legible, así que la señal manda y NO
@@ -1809,9 +1968,15 @@ function lrVivoStart(user) {
   ntLoadFirebase(false).then(fb => {
     if (!LRV.on) return;
     LRV.ref = fb.database().ref('meta/bd_rev');
-    LRV.cb = LRV.ref.on('value', () => {
+    LRV.cb = LRV.ref.on('value', (snap) => {
       llego = true; clearTimeout(t0);
-      if (LRV.primer) { LRV.primer = false; return; }   // el primer valor es el estado actual
+      const v = (snap && snap.val && snap.val()) || {};
+      const ts = Number(v.ts || 0);
+      /* 12/10/2026 · Fase 4: el primer valor es el estado actual. Si la lista
+         (de la caché de sesión) se armó ANTES de esa hora, se renueva. */
+      if (LRV.primer) { LRV.primer = false; if (ts && LRV.tsLista && ts > LRV.tsLista) lrVivoTocar(); return; }
+      /* Mi propio guardado ya está pintado: no se vuelve a pedir la lista. */
+      if (v.dev && v.dev === DEV_ID) { RAP.tocar(lrClaveCache(), 'bd', ts); LRV.tsLista = Math.max(LRV.tsLista || 0, ts); return; }
       lrVivoTocar();
     }, () => { clearTimeout(t0); if (LRV.on) lrVivoRespaldo(user); });
   }).catch(() => { clearTimeout(t0); if (LRV.on) lrVivoRespaldo(user); });
@@ -1841,8 +2006,11 @@ function lrVivoTocar() {
 async function lrVivoRefrescar() {
   if (!lrVivoVivo()) return;
   try {
-    const r = await apiSilencio('pub.liderReferidos', lrCtx({ documento: LRV.user.documento }));
+    const r0 = await apiSilencio('pub.liderReferidos', lrCtx(Object.assign({ documento: LRV.user.documento }, RAP.params())));
+    const r = await RAP.abrir(r0);
     if (!r || !r.ok || !lrVivoVivo()) return;
+    RAP.guardar(lrClaveCache(), r, (r0 && r0.fmt === 2) ? r0 : null);
+    LRV.tsLista = Math.max(LRV.tsLista || 0, Number(r.rv && r.rv.bd) || 0);
     if (lrFirma(r.referidos) === LRV.sig) return;      // nada cambió para mi grupo
     if (r.opciones) LIDER.opciones = r.opciones;
     const q = ($('#lr-q') && $('#lr-q').value) || '';
@@ -1855,8 +2023,22 @@ async function lrVivoRefrescar() {
   } catch (e) { /* sin conexión: el próximo aviso lo intenta de nuevo */ }
 }
 
+/* 12/10/2026 · Fase 4: repinta la lista que ya está en memoria (tras editar
+   o ceder) conservando búsqueda, pastilla de municipio y posición. */
+function lrRepintarLocal(user) {
+  if (!document.getElementById('lr-body')) return;
+  const q = ($('#lr-q') && $('#lr-q').value) || '';
+  const y = window.scrollY;
+  lrPintar(user, LR_REFS);
+  const bq = $('#lr-q'); if (bq && q) bq.value = q;
+  lrAplicar();
+  window.scrollTo(0, y);
+  RAP.tocar(lrClaveCache());
+}
+
 /* ---- NUEVO REFERIDO ---- */
 function liderNuevoReferido(user) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   app.innerHTML = `${backLider('Nuevo referido')}<div class="pad stack"><div class="card pad stack">
     <p class="muted">Escribe el documento. Verificaremos si ya está registrado antes de continuar.</p>
     ${field('Documento', inputEl('nr-doc', 'inputmode="numeric" maxlength="10" placeholder="Número de documento"'))}
@@ -1901,7 +2083,7 @@ function nrExistente(user, doc, info) {
       const r = await api('pub.liderAsignar', {}, 'POST', lrCtx({ documento: user.documento, refDoc: doc }));
       saving(asg, false);
       if (!r.ok) return toast(r.msg || 'No se pudo asignar', 'err');
-      toast('¡Sumado a tu grupo!', 'ok'); liderReferidos(user);
+      toast('¡Sumado a tu grupo!', 'ok'); RAP.olvidar(lrClaveCache()); liderReferidos(user);
     } catch (e) { toast('Error de conexión', 'err'); saving(asg, false); }
   };
 }
@@ -1943,7 +2125,7 @@ function nrNuevo(user, doc) {
       const r = await api('pub.liderNuevoRef', {}, 'POST', lrCtx(body));
       saving(btn, false);
       if (!r.ok) return toast(r.msg || 'No se pudo registrar', 'err');
-      toast('¡Referido registrado!', 'ok'); liderReferidos(user);
+      toast('¡Referido registrado!', 'ok'); RAP.olvidar(lrClaveCache()); liderReferidos(user);
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
 }
@@ -1951,6 +2133,7 @@ function nrNuevo(user, doc) {
 /* ---- MIS SERVICIOS ---- */
 let MS = { data: null, estado: 'TODAS', texto: '' };
 async function liderServicios(user) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   app.innerHTML = `${backLider('Mis servicios')}<div class="pad stack" id="ls-body">${loadingBox('Cargando…')}</div>`;
   app.hidden = false; hideSplash(); bindBackLider(user); appWide(true);
   try {
@@ -2237,6 +2420,7 @@ function msFormSolicitud(user) {
 let LC = { data: [], estado: 'TODAS', plantilla: '' };
 
 async function liderCompromisos(user) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   app.innerHTML = `${backLider('Mis compromisos')}<div class="pad" id="lc-body">${loadingBox('Cargando…')}</div>`;
   app.hidden = false; hideSplash(); bindBackLider(user); appWide(true);   /* 23/07: va DESPUES de bindBackLider, que apaga el ancho */
   try {
@@ -2360,6 +2544,7 @@ function lcSolicitarRevision(c) {
 let LS = { data: [], estado: 'TODAS', plantilla: '' };
 
 async function liderSolicitudes(user) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   app.innerHTML = `${backLider('Mis solicitudes')}<div class="pad" id="ls2-body">${loadingBox('Cargando…')}</div>`;
   app.hidden = false; hideSplash(); bindBackLider(user); appWide(true);   /* 23/07: va DESPUES de bindBackLider, que apaga el ancho */
   try {
@@ -2494,6 +2679,7 @@ async function liderOlvideClave(user) {
      inició sesión, así que se precarga su documento como contraseña actual
      (es la que traen de fábrica) y no se muestra la tarjeta del correo. */
 function liderActualizarClave(user, opts) {
+  RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   opts = opts || {};
   const enSesion = !!(LIDER && LIDER.documento === user.documento);
   const precargar = !!opts.precargar;
@@ -2561,7 +2747,7 @@ function liderActualizarClave(user, opts) {
         return toast(r.msg || 'No se pudo actualizar', 'err');
       }
       /* Se vuelve al login: la sesión y la clave recordada quedan viejas. */
-      LIDER = null;
+      LIDER = null; liderSesBorrar();
       try { localStorage.removeItem(LIDER_REMEMBER_KEY); } catch {}
       toast('Contraseña actualizada. Ingresa con la nueva.', 'ok');
       viewLideres(user);
@@ -2623,12 +2809,17 @@ async function viewComercio(user) {
   try {
     /* Las dos lecturas van en paralelo. Si la social falla, la vitrina se
        pinta igual con los contadores en cero. */
-    const [data, social] = await Promise.all([
-      api('com.todo'),
-      api('pub.comSocial', { documento: user.documento }).catch(() => ({ com: {} }))
-    ]);
+    /* 12/10/2026 · Fase 4: la vitrina sale del paquete público (al instante);
+       las estrellas y reseñas de ESTA persona llegan de fondo y se repinta la
+       lista cuando aterrizan (antes se esperaban las dos cosas: ~4 s). */
+    const data = await PUB.o('comercios', () => api('com.todo'));
     COM_STATE = { items: (data && data.items) || [], categorias: (data && data.categorias) || [], filtro: 'TODAS', q: '', menu: false, tocado: false };
-    COM_SOCIAL = (social && social.com) || {};
+    COM_SOCIAL = {};
+    apiSilencio('pub.comSocial', { documento: user.documento }).then(social => {
+      if (!$('#com-list') || COM_USER !== user) return;
+      COM_SOCIAL = (social && social.com) || {};
+      if (COM_STATE.items.length && !layer.children.length) comAplicarFiltro();
+    }).catch(() => {});
   } catch (e) {
     $('#com-list').innerHTML = `<p class="center muted" style="padding:24px 0;">No se pudieron cargar los comercios.</p>`;
     return;
@@ -3618,7 +3809,10 @@ async function viewNoticias(user) {
 async function ntCargar(avisar) {
   const body = $('#nt-body'); if (!body) return;
   try {
-    const r = await api('pub.noticias');
+    /* 12/10/2026 · Fase 4: del paquete público. Con aviso de noticia nueva se
+       revalida primero (Firebase dice que el canal cambió → el CORE lo rearma). */
+    if (avisar) await PUB.refrescar(true);
+    const r = avisar ? (PUB.dato('noticias') || await api('pub.noticias')) : await PUB.o('noticias', () => api('pub.noticias'));
     NT_ALL = (r && r.items) || [];
   } catch (e) {
     body.innerHTML = `<p class="muted center">No pudimos cargar las noticias. Revisa tu conexión.</p>`;
@@ -3649,9 +3843,22 @@ function ntNoLeidas(items) {
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 async function initApp() {
   if (typeof APP_VERSION !== 'undefined' && APP_VERSION) { APP_VERSION_LOADED = String(APP_VERSION); paintVersion(APP_VERSION_LOADED); }
-  checkVersion(); setInterval(checkVersion, 60000);
-  // Carga de enlaces configurables (no bloquea el arranque)
-  api('pub.config').then(c => { if (c) { APP_CONFIG = c; if (c.comercioUrl) COMERCIO_URL = c.comercioUrl; } }).catch(() => {});
+  /* 12/10/2026 · Fase 4: la versión se revisa al volver a la app (visibilitychange)
+     y cada 10 min; el service worker ya la revisa en cada apertura. */
+  checkVersion(); setInterval(checkVersion, 600000);
+  /* Paquete público: lo guardado en el teléfono ya está; se revalida de fondo
+     (Firebase primero). Si algo cambió, se repinta la vista pública abierta. */
+  usarConfig(PUB.dato('config'));
+  PUB.alCambiar(cambios => {
+    if (cambios.indexOf('config') >= 0) usarConfig(PUB.dato('config'));
+    if (cambios.indexOf('residencias') >= 0) _resiCache = null;
+    if (cambios.indexOf('servicios') >= 0) _serviCache = null;
+    if (layer.children.length) return;   // no se repinta encima de una hoja abierta
+    const ruta = (location.hash.replace(/^#\//, '') || '').split('?')[0];
+    const toca = { '': 'inicio', home: 'inicio', noticias: 'noticias', casa: 'casa', emergencia: 'emergencia' }[ruta];
+    if (toca && cambios.indexOf(toca) >= 0 && getActive()) render();
+  });
+  PUB.refrescar(false);
   const hash = location.hash || '';
   const arranqueLimpio = (hash === '' || hash === '#/' || hash.startsWith('#/login'));
   const yaContinuoWeb = sessionStorage.getItem(nsKey('continuedWeb')) === '1';
@@ -3677,7 +3884,7 @@ async function viewCasa(user) {
   app.hidden = false; hideSplash(); appWide(true);   /* 23/07 */
   $('#backbtn').onclick = () => go('home');
   try {
-    CASA = await api('pub.casa');
+    CASA = await PUB.o('casa', () => api('pub.casa'));   /* 12/10 · Fase 4 */
     casaPintar();
   } catch (e) {
     $('#casa-body').innerHTML = `<div class="card pad center"><p class="muted">No se pudo cargar la casa social. Revisa tu conexión.</p></div>`;
@@ -3774,7 +3981,7 @@ async function viewEmergencia(user) {
   app.hidden = false; hideSplash(); appWide(true);   /* 23/07 */
   $('#backbtn').onclick = () => go('home');
   try {
-    const e = await api('pub.emergencia');
+    const e = await PUB.o('emergencia', () => api('pub.emergencia'));   /* 12/10 · Fase 4 */
     emPintar(e);
   } catch (err) {
     $('#em-body').innerHTML = `<div class="card pad center"><p class="muted">No se pudieron cargar los contactos. Revisa tu conexión.</p></div>`;

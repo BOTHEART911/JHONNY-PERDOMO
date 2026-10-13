@@ -1,0 +1,30 @@
+/* ============================================================================
+   ancho-pc.css — APROVECHAR EL ANCHO EN PC (12/10/2026 · Fase 4)
+   ----------------------------------------------------------------------------
+   El teléfono queda igual: todo vive en min-width. body.wide lo pone la ruta.
+   · 701–1199 px: baldosas del Inicio y de la Zona de líderes en horizontal
+     (ícono a la izquierda, texto a la derecha): caben más por fila.
+   · ≥1200 px (monitor): contenedor a 1320 px, 4 columnas de baldosas,
+     4 de referidos, 3 de comercios.
+   · ≥1600 px (monitor grande): 1680 px, 5 columnas.
+   ============================================================================ */
+@media (min-width: 701px) {
+  body.wide .menu-grid .tile { flex-direction: row; align-items: center; gap: 14px; padding: 14px 16px; }
+  body.wide .menu-grid .tile .ico { flex: 0 0 44px; }
+  body.wide .menu-grid .tile .txt { flex: 1; min-width: 0; }
+}
+@media (min-width: 1200px) {
+  body.wide .app { max-width: 1320px; }
+  body.wide .menu-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.wide .ref-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.wide .com-list { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: none; }
+  body.wide #inicio .hero-img,
+  body.wide #inicio .hero-fallback { aspect-ratio: 3 / 1; }
+  body.wide .nt-feed { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
+@media (min-width: 1600px) {
+  body.wide .app { max-width: 1680px; }
+  body.wide .menu-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  body.wide .ref-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  body.wide .com-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
