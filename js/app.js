@@ -3521,7 +3521,7 @@ function hideSplash() { const s = $('#splash'); if (s && !s.classList.contains('
 const NT_FBCFG = (typeof MARCA !== 'undefined' && MARCA.FIREBASE) || {};
 /* Clave pública VAPID (Firebase Console → Cloud Messaging → Certificados push web).
    Es PÚBLICA por diseño: identifica al remitente, no autoriza a enviar. */
-const NT_VAPID = 'BIx99jmx_Bxg05CqJu3UDqHqN-icTA-g_4GKdbDcEZwL_LIgxv6l5Ao3LcEtmYFdBKp9X04ogoq62LxTATpNR-s';
+const NT_VAPID = (typeof MARCA !== 'undefined' && MARCA.FB_VAPID) || 'BIx99jmx_Bxg05CqJu3UDqHqN-icTA-g_4GKdbDcEZwL_LIgxv6l5Ao3LcEtmYFdBKp9X04ogoq62LxTATpNR-s';   /* 13/10/2026: vive en js/marca.js (FB_VAPID); esto es solo el respaldo */
 
 const NT_LEIDAS_KEY = nsKey('jp_noticias_leidas');   // ts de la última noticia vista
 const NT_TOKEN_KEY = nsKey('jp_fcm_token');          // token registrado en este dispositivo

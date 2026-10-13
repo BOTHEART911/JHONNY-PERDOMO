@@ -53,6 +53,12 @@
       measurementId: "G-KBPJGFRTCP"
     },
 
+    /* Clave pública VAPID del MISMO proyecto de Firebase (Consola →
+       Configuración del proyecto → Cloud Messaging → Certificados push
+       web). Es pública por diseño. Sin ella el teléfono no se suscribe
+       a los avisos. */
+    FB_VAPID: 'BIx99jmx_Bxg05CqJu3UDqHqN-icTA-g_4GKdbDcEZwL_LIgxv6l5Ao3LcEtmYFdBKp9X04ogoq62LxTATpNR-s',
+
 
     /* URL del Web App del backend (JHONNY CORE, /exec). La MISMA
        para todas las apps de una campaña. */
