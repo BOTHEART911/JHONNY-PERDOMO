@@ -1307,6 +1307,74 @@ function lrEntrarComo(user, codigo, nombre) {
    ============================================================ */
 let LR_REFS = [];   // la lista tal cual está pintada (los mismos objetos que las tarjetas)
 
+/* ============================================================
+   PARCHE DE FILA TRAS GUARDAR  (03/11/2026 · regla 12)
+   ------------------------------------------------------------
+   Las 5 escrituras de la zona (nuevo, sumar a mi grupo, marcar, editar,
+   ceder) ya NO vuelven a pedir la lista completa: el CORE devuelve la
+   fila armada (`fila`) o el documento que sale (`quitar`) y aquí se
+   agrega, reemplaza o quita en memoria. La copia local de la sesión se
+   descarta (RAP.tocar) para que una recarga de página no muestre algo viejo.
+   BANDERA: si el CORE desplegado todavía no devuelve `fila`, se sigue por
+   el camino de antes (front y CORE se suben en cualquier orden).
+   `rvAntes` (hora del canal 'bd' ANTES de mi escritura) deja que la señal
+   EN VIVO reconozca mi propio guardado al volver a la lista y no la pida.
+   ============================================================ */
+let LR_PROPIO = null;
+const LR_MED = (window.LR_MED = window.LR_MED || []);
+function lrMedir(accion, t0, extra) {
+  requestAnimationFrame(() => {
+    const ms = Math.round(performance.now() - t0);
+    const red = (window.RED && RED.medidas && RED.medidas().slice(-1)[0]) || {};
+    LR_MED.push(Object.assign({ accion, pantallaMs: ms, redMs: red.ms, kb: red.kb, t: Date.now() }, extra || {}));
+    if (LR_MED.length > 100) LR_MED.shift();
+  });
+}
+function lrAnotarPropio(r) {
+  LR_PROPIO = (r && r.rvAntes != null) ? { rvAntes: Number(r.rvAntes) || 0, t: Date.now() } : null;
+}
+function lrEsPropio(v) {
+  const p = LR_PROPIO;
+  if (!p || !v || !v.dev || v.dev !== DEV_ID || Date.now() - p.t > 120000) return false;
+  LR_PROPIO = null;
+  return p.rvAntes <= (LRV.tsLista || 0);
+}
+function lrListaMem() {
+  const e = RAP.tomar(lrClaveCache());
+  return (e && e.data && e.data.ok && Array.isArray(e.data.referidos)) ? e.data.referidos : null;
+}
+/* Agrega arriba, reemplaza (mismo objeto, para no romper referencias) o quita. */
+function lrAplicarFila(lista, fila, quitar) {
+  if (!lista) return null;
+  const doc = String(quitar || (fila && fila.documento) || '');
+  const i = lista.findIndex(x => String(x.documento) === doc);
+  if (quitar) { if (i >= 0) lista.splice(i, 1); return null; }
+  if (i >= 0) { Object.assign(lista[i], fila); return lista[i]; }
+  lista.unshift(fila);
+  return fila;
+}
+/* Parcha LR_REFS y la copia en memoria de la vista (suelen ser el mismo arreglo). */
+function lrParchar(fila, quitar) {
+  const rf = lrAplicarFila(LR_REFS, fila, quitar);
+  const mem = lrListaMem();
+  if (mem && mem !== LR_REFS) lrAplicarFila(mem, fila ? Object.assign({}, fila) : null, quitar);
+  RAP.tocar(lrClaveCache());
+  return rf;
+}
+/* Tras parchar: solo la tarjeta tocada, la barra, las pastillas y el filtro. */
+function lrTrasParche(doc, rf) {
+  const lista = document.getElementById('lr-list');
+  if (lista) {
+    const card = lista.querySelector('.rcard[data-doc="' + CSS.escape(String(doc)) + '"]');
+    if (rf && card) card.outerHTML = referidoCard(rf);
+    else if (!rf && card) card.remove();
+  }
+  LRV.sig = lrFirma(LR_REFS);
+  lrFidRefrescar();
+  if (document.getElementById('lr-muns')) lrPintarMuns();
+  lrAplicar();
+}
+
 function lrTrabColor(p) { return p >= 80 ? 'ld-verde' : p >= 40 ? 'ld-azul' : 'ld-rojo'; }
 
 function lrFidHtml(list) {
@@ -1585,11 +1653,11 @@ function pintarReferidos(user, referidos) {
   lista.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]'); if (!b || !lista.contains(b)) return;
     const card = b.closest('.rcard'); if (!card) return;
-    const rf = porDoc.get(String(card.dataset.doc)); if (!rf) return;
+    const rf = porDoc.get(String(card.dataset.doc)) || LR_REFS.find(x => String(x.documento) === String(card.dataset.doc)); if (!rf) return;
     switch (b.dataset.act) {
       case 'asis':     return selectorMarcar(user, rf, 'ASISTENCIA', card);
       case 'inten':    return selectorMarcar(user, rf, 'INTENCION', card);
-      case 'edit':     return liderEditarReferido(user, rf, () => lrRepintarLocal(user));
+      case 'edit':     return liderEditarReferido(user, rf, () => lrTrasParche(rf.documento, rf));
       case 'conectar': return window.open('https://wa.me/57' + onlyDig(rf.contacto) + '?text=' + encodeURIComponent(msgConectar(rf)), '_blank');
       case 'ceder':    return liderCeder(user, rf);   // 22/07
       case 'wa':       return window.open('https://wa.me/57' + onlyDig(rf.contacto), '_blank');
@@ -1796,17 +1864,27 @@ function selectorMarcar(user, rf, campo, card) {
 
   const guardar = async (valor) => {
     closeLayer();
+    /* 03/11: tarjeta ocupada desde el primer toque (el escudo de la capa 12
+       cubre la pantalla mientras viaja; el rid lo pone red.js). */
+    const vivo = card && card.isConnected ? card : document.querySelector('.rcard[data-doc="' + CSS.escape(String(rf.documento)) + '"]');
+    if (vivo && vivo.dataset.busy === '1') return;
+    if (vivo) vivo.dataset.busy = '1';
+    const t0 = performance.now();
     try {
       const r = await api('pub.liderMarcar', {}, 'POST', lrCtx({ documento: user.documento, refDoc: rf.documento, campo, valor }));
       if (!r.ok) return toast(r.msg || 'No se pudo guardar', 'err');
-      // actualizar en memoria y repintar solo el badge de esta tarjeta
-      if (campo === 'ASISTENCIA') rf.asistencia = valor; else rf.intencion = valor;
-      RAP.tocar(lrClaveCache());   // 12/10 · Fase 4: la fila ya está parchada en memoria; la copia local se descarta
-      const badges = card.querySelector('.rc-badges');
+      /* La fila del CORE manda (03/11); con un CORE anterior se parcha a mano. */
+      if (r.fila) lrParchar(r.fila);
+      else { if (campo === 'ASISTENCIA') rf.asistencia = valor; else rf.intencion = valor; RAP.tocar(lrClaveCache()); }
+      const c2 = document.querySelector('.rcard[data-doc="' + CSS.escape(String(rf.documento)) + '"]');
+      const badges = c2 && c2.querySelector('.rc-badges');
       if (badges) badges.innerHTML = refBadgesHtml(rf);
       if (campo === 'INTENCION') lrFidRefrescar();   // 26/07: la barra se mueve al instante
+      LRV.sig = lrFirma(LR_REFS);
+      lrMedir('marcar', t0);
       toast(valor ? 'Actualizado' : 'Marca quitada', 'ok');
     } catch (e) { toast('Error de conexión', 'err'); }
+    finally { if (vivo) delete vivo.dataset.busy; }
   };
 
   layer.querySelectorAll('.opt-row').forEach(b => b.onclick = () => {
@@ -1840,16 +1918,22 @@ function liderEditarReferido(user, rf, onDone) {
     const tel = onlyDig(val('er-tel')), resi = val('er-resi');
     if (!nom || nom.length < 3) return toast('Escribe el nombre completo', 'err');
     if (tel && !/^\d{10}$/.test(tel)) return toast('El WhatsApp debe tener 10 dígitos', 'err');
-    const btn = $('#er-save'); saving(btn, true);
+    const btn = $('#er-save'); if (btn.disabled) return; saving(btn, true);
+    const t0 = performance.now();
     try {
       const r = await api('pub.liderEditarRef', {}, 'POST', lrCtx({ documento: user.documento, refDoc: rf.documento, nombre: nom, contacto: tel, residencia: resi }));
       saving(btn, false);
       if (!r.ok) return toast(r.msg || 'No se pudo guardar', 'err');
-      /* 12/10/2026 · Fase 4: la fila se parcha en memoria (sin volver a pedir la lista) */
-      rf.nombre = r.nombre || nom.toUpperCase();
-      if (tel) rf.contacto = tel;
-      if (resi) rf.residencia = resi;
+      /* 03/11: la fila del CORE manda; con un CORE anterior, parche a mano (12/10) */
+      if (r.fila) lrParchar(r.fila);
+      else {
+        rf.nombre = r.nombre || nom.toUpperCase();
+        if (tel) rf.contacto = tel;
+        if (resi) rf.residencia = resi;
+        RAP.tocar(lrClaveCache());
+      }
       closeLayer(); toast('Referido actualizado', 'ok'); if (onDone) onDone();
+      lrMedir('editar', t0);
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
 }
@@ -1905,14 +1989,20 @@ function liderCeder(user, rf, preset) {
     const ok = await confirmar('Confirma la cesión',
       crow('Referido', rf.nombre) + crow('Documento', rf.documento) + crow('Nuevo líder', etiqueta));
     if (!ok) return liderCeder(user, rf, etiqueta);   // "Seguir editando": vuelve con lo elegido
+    const card = document.querySelector('.rcard[data-doc="' + CSS.escape(String(rf.documento)) + '"]');
+    if (card && card.dataset.busy === '1') return;
+    if (card) card.dataset.busy = '1';
+    const t0 = performance.now();
     try {
       const r = await api('pub.liderCeder', {}, 'POST', { documento: user.documento, refDoc: rf.documento, destino: destino });
       if (!r.ok) return toast(r.msg || 'No se pudo ceder', 'err');
       toast('Cedido a ' + (r.lider || etiqueta), 'ok');
-      /* 12/10/2026 · Fase 4: sale de la lista en memoria; sin recargar */
-      const i = LR_REFS.indexOf(rf); if (i >= 0) LR_REFS.splice(i, 1);
-      lrRepintarLocal(user);
+      /* 03/11: sale de la lista en memoria y solo se quita su tarjeta */
+      lrParchar(null, r.quitar || rf.documento);
+      lrTrasParche(rf.documento, null);
+      lrMedir('ceder', t0);
     } catch (e) { toast('Error de conexión', 'err'); }
+    finally { if (card) delete card.dataset.busy; }
   };
 }
 
@@ -1974,7 +2064,16 @@ function lrVivoStart(user, tsLista) {
       const ts = Number(v.ts || 0);
       /* 12/10/2026 · Fase 4: el primer valor es el estado actual. Si la lista
          (de la caché de sesión) se armó ANTES de esa hora, se renueva. */
-      if (LRV.primer) { LRV.primer = false; if (ts && LRV.tsLista && ts > LRV.tsLista) lrVivoTocar(); return; }
+      if (LRV.primer) {
+        LRV.primer = false;
+        if (ts && LRV.tsLista && ts > LRV.tsLista) {
+          /* 03/11: lo más nuevo es MI guardado (y nada ajeno entró antes): la
+             lista en memoria ya lo tiene parchado, no se pide de nuevo. */
+          if (lrEsPropio(v)) { RAP.tocar(lrClaveCache(), 'bd', ts); LRV.tsLista = ts; return; }
+          lrVivoTocar();
+        }
+        return;
+      }
       /* Mi propio guardado ya está pintado: no se vuelve a pedir la lista. */
       if (v.dev && v.dev === DEV_ID) { RAP.tocar(lrClaveCache(), 'bd', ts); LRV.tsLista = Math.max(LRV.tsLista || 0, ts); return; }
       lrVivoTocar();
@@ -2036,6 +2135,24 @@ function lrRepintarLocal(user) {
   RAP.tocar(lrClaveCache());
 }
 
+/* 03/11/2026 · Tras NUEVO o SUMAR A MI GRUPO se vuelve a Mis referidos
+   pintando de memoria con la fila ya agregada: CERO viajes. Solo si el CORE
+   no devolvió la fila (versión anterior) o no hay lista en memoria se pide
+   la lista como antes. */
+function lrVolverTrasGuardar(user, r, accion, t0) {
+  const mem = lrListaMem();
+  if (mem && (r.fila || r.fuera)) {
+    if (r.fila) { lrAplicarFila(mem, r.fila); RAP.tocar(lrClaveCache()); }
+    lrAnotarPropio(r);
+    liderReferidos(user);
+    lrMedir(accion, t0, { viajes: 1 });
+    return;
+  }
+  RAP.olvidar(lrClaveCache());
+  liderReferidos(user);
+  lrMedir(accion + '-respaldo', t0, { viajes: 2 });
+}
+
 /* ---- NUEVO REFERIDO ---- */
 function liderNuevoReferido(user) {
   RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
@@ -2078,12 +2195,14 @@ function nrExistente(user, doc, info) {
     </div>`;
   const asg = $('#nr-asignar');
   if (asg) asg.onclick = async () => {
-    saving(asg, true);
+    if (asg.disabled) return; saving(asg, true);
+    const t0 = performance.now();
     try {
       const r = await api('pub.liderAsignar', {}, 'POST', lrCtx({ documento: user.documento, refDoc: doc }));
       saving(asg, false);
       if (!r.ok) return toast(r.msg || 'No se pudo asignar', 'err');
-      toast('¡Sumado a tu grupo!', 'ok'); RAP.olvidar(lrClaveCache()); liderReferidos(user);
+      toast('¡Sumado a tu grupo!', 'ok');
+      lrVolverTrasGuardar(user, r, 'asignar', t0);
     } catch (e) { toast('Error de conexión', 'err'); saving(asg, false); }
   };
 }
@@ -2120,12 +2239,14 @@ function nrNuevo(user, doc) {
     const lp = (APP_CONFIG && APP_CONFIG.liderPrincipal) || null;
     const filaLider = principal ? crow('Se guarda a', 'Líder Principal · N° 1' + (lp ? ' (' + lp.nombre + ')' : '')) : '';
     const ok = await confirmar('Confirma el nuevo referido', crow('Nombre', body.nombre) + crow('Documento', doc) + crow('WhatsApp', body.contacto) + crow('Residencia', body.residencia) + filaLider); if (!ok) return;
-    const btn = $('#nr-save'); saving(btn, true);
+    const btn = $('#nr-save'); if (btn.disabled) return; saving(btn, true);
+    const t0 = performance.now();
     try {
       const r = await api('pub.liderNuevoRef', {}, 'POST', lrCtx(body));
       saving(btn, false);
       if (!r.ok) return toast(r.msg || 'No se pudo registrar', 'err');
-      toast('¡Referido registrado!', 'ok'); RAP.olvidar(lrClaveCache()); liderReferidos(user);
+      toast('¡Referido registrado!', 'ok');
+      lrVolverTrasGuardar(user, r, 'nuevo', t0);
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
 }
