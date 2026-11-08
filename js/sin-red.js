@@ -65,7 +65,16 @@
     var tmr = setTimeout(function () { if (ctrl) ctrl.abort(); }, ms);
     return fetch(SONDA + '?t=' + t0, { mode: 'no-cors', cache: 'no-store', credentials: 'omit', signal: ctrl ? ctrl.signal : undefined })
       .then(function () { clearTimeout(tmr); return (ahora() - t0) > 2500 ? 'lenta' : 'en'; })
-      .catch(function () { clearTimeout(tmr); return 'sin'; });
+      .catch(function () {
+        clearTimeout(tmr);
+        /* Una red que bloquea gstatic.com no es "sin conexión": se confirma
+           con un archivo propio de la app antes de decirlo. */
+        var c2 = typeof AbortController === 'function' ? new AbortController() : null;
+        var t2 = setTimeout(function () { if (c2) c2.abort(); }, 4000);
+        return fetch('./js/version.js?sr=' + ahora(), { cache: 'no-store', signal: c2 ? c2.signal : undefined })
+          .then(function (r) { clearTimeout(t2); return r && r.ok ? 'en' : 'sin'; })
+          .catch(function () { clearTimeout(t2); return 'sin'; });
+      });
   }
   function poner(nuevo) {
     var antes = estado;
