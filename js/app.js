@@ -391,7 +391,7 @@ function go(route) { location.hash = '#/' + route; }
    instante despues aparecia Inicio. Dos pasos en vez de uno.
    Las sub-vistas de la zona de lideres no son rutas propias y siguen encendiendo
    el ancho ellas mismas al pintar. */
-const RUTAS_ANCHAS = new Set(['', 'home', 'ideas', 'casa', 'emergencia', 'comercio', 'noticias', 'lideres']);
+const RUTAS_ANCHAS = new Set(['', 'home', 'solicitud', 'ideas', 'casa', 'emergencia', 'comercio', 'noticias', 'lideres']);   // 07/11/2026: + Solicitudes y Gestiones
 /* Ensancha el contenedor en vistas con grid (referidos/servicios) */
 function appWide(on) { document.body.classList.toggle('wide', !!on); }
 window.addEventListener('hashchange', render);

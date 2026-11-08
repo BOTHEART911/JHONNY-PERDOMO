@@ -49,3 +49,8 @@ html.oscuro .gs-calif { background: #3a2f12; color: #F5C26B; border-color: #6b54
 @media (max-width: 520px) { .gs-top .btn { width: 100%; justify-content: center; } .gs-grid { grid-template-columns: 1fr; } }
 .sheet .gs-pick button svg, .sheet .gs-pick button svg path { fill: var(--line) !important; stroke: none !important; }
 .sheet .gs-pick button.on svg, .sheet .gs-pick button.on svg path { fill: #F5B301 !important; }
+/* PC: la vista usa el ancho (body.wide la ensancha); tarjetas en columnas */
+@media (min-width: 900px) {
+  body.wide .gs-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+  body.wide .gs-top { padding: 20px 24px; }
+}
