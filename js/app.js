@@ -85,8 +85,9 @@ const LZ_ZONA = new Set(('pub.rev pub.liderAsignar pub.liderReferidos pub.liderM
   'pub.liderCeder pub.liderNuevoRef pub.liderCompromisos pub.liderComTraza pub.liderSolicitudes pub.liderSolTraza ' +
   'pub.liderInsights pub.padrinoEntrar pub.liderBalances pub.liderBalanceVer pub.liderBalancePdf pub.liderBalanceXlsx ' +
   'pub.liderServicios pub.servResponder pub.servEliminar pub.servEnviarResp pub.servExcel pub.servAgregar ' +
-  'pub.servNuevaSolicitud pub.esProfesional').split(' '));
-const LZ_CON_DEV = new Set(['pub.liderMarcar', 'pub.liderEditarRef', 'pub.liderNuevoRef', 'pub.liderAsignar', 'pub.liderCeder']);
+  'pub.servNuevaSolicitud pub.esProfesional ' +
+  'pub.liderPendRevisar pub.liderNuevoLote').split(' '));   /* 08/11/2026 · pendientes sin conexión */
+const LZ_CON_DEV = new Set(['pub.liderMarcar', 'pub.liderEditarRef', 'pub.liderNuevoRef', 'pub.liderAsignar', 'pub.liderCeder', 'pub.liderNuevoLote']);
 const DEV_ID = (() => { try { let d = localStorage.getItem(nsKey('jp_dev')); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem(nsKey('jp_dev'), d); } return d; } catch { return ''; } })();
 function conPase(action, params, body, method) {
   const extra = {};
@@ -102,12 +103,15 @@ function leeOff() { _leeActivas = Math.max(0, _leeActivas - 1); if (_leeActivas 
 async function api(action, params = {}, method = 'GET', body = null) {
   if (API_URL.startsWith('PEGA_AQUI')) { toast('Falta configurar la URL del backend', 'err'); throw new Error('API_URL sin configurar'); }
   const lectura = RED.esLectura(action);
+  /* 08/11/2026 · sin conexión: lo que escribe no sale a esperar 60 s; se avisa
+     al instante (lo que se puede hacer sin señal va a Pendientes por subir). */
+  if (!lectura && window.SINRED && !SINRED.enLinea()) { const e = new Error('Sin conexión: esto necesita señal'); e.red = true; throw e; }
   [params, body] = conPase(action, params, body, method);
   const on = lectura ? leeOn : loaderOn, off = lectura ? leeOff : loaderOff;
   on();
   let json;
   try { json = await RED.pedir(API_URL, action, params, { metodo: method, cuerpo: method === 'POST' ? (body || {}) : null }); }
-  catch (e) { off(); if (e && e.cortado) return new Promise(() => {}); throw e; }
+  catch (e) { off(); if (e && e.cortado) return new Promise(() => {}); if (window.SINRED) SINRED.fallo(e); throw e; }
   off();
   if (!json.ok) { if (json.error === 'SESION_LIDER_VENCIDA') liderVencida(); throw new Error(json.error || 'Error del servidor'); }
   return json.data;
@@ -327,6 +331,9 @@ function loadScript(src) { return new Promise((res, rej) => { const s = document
 
 /* ---------- Íconos ---------- */
 const I = {
+  /* 08/11/2026 · Pendientes por subir (nube con flecha) y Prepararme sin señal (bajar) */
+  upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>',
   user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
   swap:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3 21 7l-4 4"/><path d="M21 7H9"/><path d="M7 21 3 17l4-4"/><path d="M3 17h12"/></svg>',
@@ -693,6 +700,14 @@ async function viewHome(user) {
 
   app.innerHTML = `${appbar(user)}<div class="pad stack"><div><p class="eyebrow">${esc(MV.lema)}</p><h1 class="h1">Hola, ${esc(primerNombre(user.nombre))} 👋🏾</h1><span class="plan-badge ${plan.premium ? 'premium' : ''}">${esc(plan.label)}</span></div><div id="inicio"><div class="hero"><div class="skeleton" style="aspect-ratio:16/10;"></div></div></div><div id="banner"></div><p class="eyebrow" style="margin-top:6px;">Explora</p><div class="menu-grid">${menu.map(m => `<button class="tile ${m.gold ? 'gold' : ''} ${m.wide ? 'wide' : ''}" data-id="${m.id}"><span class="ico">${I[m.icon]}</span><span class="txt"><b>${esc(m.title)}</b><br><span>${esc(m.desc)}</span></span></button>`).join('')}</div><p class="center small muted" style="margin-top:10px;">${esc(MV.candidato)} · ${esc(MV.lugar)}</p></div>`;
   app.hidden = false; hideSplash(); bindAppbar(user); appWide(true);   /* 23/07: Inicio se expande en PC */
+  /* 08/11/2026 · ANOTADOR SIN CONEXIÓN: para el líder sin sesión guardada en el
+     teléfono. Solo escribe (nunca muestra datos); al entrar a su zona con la
+     contraseña lo anotado pasa a sus Pendientes por subir. */
+  if (esLider && window.PEND && !liderSesLeer(user.documento)) {
+    const g = app.querySelector('.menu-grid');
+    const n = window.SINRED ? SINRED.contar('anon') : 0;
+    if (g) g.insertAdjacentHTML('beforeend', `<button class="tile" data-id="anotador"><span class="ico">${I.pencil}</span><span class="txt"><b>Anotador sin conexión</b>${n ? `<span class="sr-badge">${n}</span>` : ''}<br><span>Anota referidos sin señal; se pasan a tu zona</span></span></button>`);
+  }
   app.querySelectorAll('.tile').forEach(t => t.onclick = () => openMenu(t.dataset.id, user));
   /* Se pinto con el valor guardado: se confirma en silencio y solo se repinta si
      de verdad cambio (dejo de ser lider o acaba de serlo) y seguimos en Inicio. */
@@ -842,7 +857,9 @@ function liderLoginPintar(user) {
      borra la que hubiera quedado de antes). Se recuerda la SESIÓN. */
   let recordada = '';
   try { const raw = localStorage.getItem(LIDER_REMEMBER_KEY); if (raw) { const o = JSON.parse(raw); if (o && o.doc === user.documento) recordada = o.clave || ''; } } catch {}
-  const recordarMarcado = !!recordada || !!localStorage.getItem(nsKey('jp_lider_recordar'));
+  /* 08/11/2026 · marcada por defecto (para poder trabajar sin señal); solo
+     queda desmarcada si el líder la desmarcó o cerró sesión en este teléfono. */
+  const recordarMarcado = !!recordada || localStorage.getItem(nsKey('jp_lider_recordar')) !== '0';
 
   app.innerHTML = `${backbar('Zona de líderes')}<div class="pad stack">
     <div class="card pad stack center">
@@ -882,7 +899,7 @@ function liderLoginPintar(user) {
       const recordar = $('#lg-recordar').checked;
       try {
         localStorage.removeItem(LIDER_REMEMBER_KEY);
-        if (recordar) localStorage.setItem(nsKey('jp_lider_recordar'), '1'); else localStorage.removeItem(nsKey('jp_lider_recordar'));
+        localStorage.setItem(nsKey('jp_lider_recordar'), recordar ? '1' : '0');
       } catch {}
       LIDER = { codigo: r.lider.codigo, nombre: r.lider.nombre, documento: user.documento, correo: r.lider.correo || '', opciones: r.opciones, tkl: r.tkl || '' };
       liderSesGuardar(LIDER, recordar);
@@ -1110,6 +1127,13 @@ async function esProfCargar(user) {
 }
 const esProfCache = (user) => (ES_PROF.doc === user.documento && ES_PROF.val !== null) ? ES_PROF.val : null;
 
+/* 08/11/2026 · texto de la baldosa "Prepararme para salir sin señal" */
+function offTxt(user) {
+  const o = window.PEND && PEND.offRefInfo(user.documento);
+  if (!o || !o.t) return 'Baja tu lista y los barrios a este teléfono';
+  const d = new Date(o.t);
+  return 'Listo ✓ · ' + o.n + ' referidos · ' + d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+}
 function liderPanel(user) {
   RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   const cache = esProfCache(user);
@@ -1121,24 +1145,36 @@ function liderPanel(user) {
 }
 
 function liderPanelPintar(user, esProf) {
+  /* 08/11/2026 · red: la baldosa necesita servidor (sin señal se ve apagada) */
   const items = [
     { id: 'l-referidos',   icon: 'user',  t: 'Mis referidos',        d: 'Referidos, asistencia e intención' },
-    { id: 'l-compromisos', icon: 'idea',  t: 'Mis compromisos',      d: 'Lo que has asumido' },
-    { id: 'l-solicitudes', icon: 'pencil', t: 'Mis solicitudes',     d: 'Lo que te han solicitado' },
-    { id: 'l-clave',       icon: 'card',  t: 'Actualizar contraseña',d: 'Cambia tu clave · actualiza tu correo' }
+    { id: 'l-pendientes',  icon: 'upload', t: 'Pendientes por subir', d: 'Lo que anotaste sin señal o pegaste', pend: true },
+    { id: 'l-compromisos', icon: 'idea',  t: 'Mis compromisos',      d: 'Lo que has asumido', red: true },
+    { id: 'l-solicitudes', icon: 'pencil', t: 'Mis solicitudes',     d: 'Lo que te han solicitado', red: true },
+    { id: 'l-preparar',    icon: 'download', t: 'Prepararme para salir sin señal', d: offTxt(user), red: true },
+    { id: 'l-clave',       icon: 'card',  t: 'Actualizar contraseña',d: 'Cambia tu clave · actualiza tu correo', red: true }
   ];
   // "Mis servicios" (panel del profesional) solo para quien esté en PROFESIONALES
-  if (esProf) items.splice(3, 0, { id: 'l-servicios', icon: 'help', t: 'Mis servicios', d: 'Solicitudes que atiendes' });
+  if (esProf) items.splice(5, 0, { id: 'l-servicios', icon: 'help', t: 'Mis servicios', d: 'Solicitudes que atiendes', red: true });
+  const offline = window.SINRED && !SINRED.enLinea();
+  const nPend = window.SINRED ? SINRED.contar(user.documento) : 0;
 
   app.innerHTML = `${backbar('Zona de líderes')}<div class="pad stack">
     <div><p class="eyebrow">Líder</p><h1 class="h1">${esc(primerNombre(LIDER.nombre))} 🤝🏾</h1>
       <span class="plan-badge premium">N° de Referido: ${esc(LIDER.codigo)}</span></div>
-    <div class="menu-grid" id="lp-grid">${items.map(m => `<button class="tile" data-id="${m.id}"><span class="ico">${I[m.icon]}</span><span class="txt"><b>${esc(m.t)}</b><br><span>${esc(m.d)}</span></span></button>`).join('')}</div>
+    <div class="menu-grid" id="lp-grid">${items.map(m => `<button class="tile${m.red && offline ? ' sr-apagado' : ''}" data-id="${m.id}"${m.red ? ' data-red="1"' : ''}><span class="ico">${I[m.icon] || I.user}</span><span class="txt"><b>${esc(m.t)}</b>${m.pend ? `<span class="sr-badge" data-pend-n ${nPend ? '' : 'hidden'}>${nPend || ''}</span>` : ''}<br><span>${esc(m.d)}</span></span></button>`).join('')}</div>
+    <button class="link-quiet" id="lp-cerrar" style="margin-top:4px;">Cerrar sesión en este teléfono</button>
   </div>`;
   app.hidden = false; hideSplash(); appWide(true); $('#backbtn').onclick = () => go('home');
   lrPrecargar(user);   /* 12/10/2026 · Fase 4: Mis referidos se trae de fondo mientras el líder mira el panel */
+  { const c = $('#lp-cerrar'); if (c && window.PEND) c.onclick = () => PEND.liderCerrarAqui(user); }
+  /* 08/11/2026 · lo anotado sin sesión (Anotador) pasa a los pendientes de este líder */
+  if (window.SINRED && SINRED.contar('anon')) { const n = SINRED.mover('anon', user.documento); if (n) toast(`${n} anotado${n === 1 ? '' : 's'} sin sesión pasaron a tus pendientes`, 'ok'); }
   app.querySelectorAll('.tile').forEach(t => t.onclick = () => {
     const id = t.dataset.id;
+    if (t.dataset.red && window.SINRED && !SINRED.enLinea()) return toast('Sin conexión: esto necesita señal', 'err');
+    if (id === 'l-pendientes')  return window.PEND && PEND.liderPendientes(user);
+    if (id === 'l-preparar')    return window.PEND && PEND.liderPreparar(user, t);
     if (id === 'l-referidos')   return liderReferidos(user);
     if (id === 'l-servicios')   return liderServicios(user);
     if (id === 'l-compromisos') return liderCompromisos(user);
@@ -1158,6 +1194,8 @@ async function lrPedir(user) {
   const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento }, RAP.params())));
   const d = await RAP.abrir(r);
   if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
+  /* 08/11/2026 · si el líder se preparó para salir sin señal, la copia se renueva */
+  if (d && d.ok && !LR_COMO && window.PEND && PEND.offRefInfo(user.documento)) PEND.offRefGuardar(user.documento, r, (d.referidos || []).length);
   return d;
 }
 /* Lectura de fondo desde el panel: si el líder toca "Mis referidos" mientras
@@ -1178,7 +1216,12 @@ async function liderReferidos(user) {
   RED.nuevaVista();
   LR_MUN = ''; LR_MUNS_TODOS = false;   // 01/09: cada entrada arranca sin filtro de municipio
   RAP.setUsuario(user.documento);
-  const enCache = RAP.tomar(lrClaveCache()) || await RAP.revivir(lrClaveCache());
+  let enCache = RAP.tomar(lrClaveCache()) || await RAP.revivir(lrClaveCache());
+  /* 08/11/2026 · sin señal y sin nada en la sesión: la copia de "Prepararme" */
+  if (!enCache && !LR_COMO && window.SINRED && !SINRED.enLinea() && window.PEND) {
+    const d = await PEND.offRefLeer(user.documento);
+    if (d && d.ok) { RAP.guardar(lrClaveCache(), d, null); enCache = RAP.tomar(lrClaveCache()) || { data: d, rv: {} }; }
+  }
   app.innerHTML = `${backLider('Mis referidos')}<div class="pad stack" id="lr-body">${enCache ? '' : loadingBox('Cargando tus referidos…')}</div>`;
   app.hidden = false; hideSplash(); bindBackLider(user); appWide(true);
   ensureConfig();   // ajuste 20/07: plantilla del botón Conectar
@@ -1202,7 +1245,15 @@ async function liderReferidos(user) {
     if (r.gestion) { LR_GESTION = r.gestion; if (LR_COMO && r.gestion.nombre) LR_GESTION.nombre = r.gestion.nombre; }
     lrPintar(user, r.referidos);
     lrVivoStart(user, (r.rv && r.rv.bd) || 0);          // 22/07: la vista queda EN VIVO
-  } catch (e) { $('#lr-body').innerHTML = `<div class="card pad center muted">Error de conexión</div>`; }
+  } catch (e) {
+    /* 08/11/2026 · se cayó la red: lo que haya en el teléfono, o el camino a Pendientes */
+    const d = (!LR_COMO && window.PEND) ? await PEND.offRefLeer(user.documento) : null;
+    if (d && d.ok && $('#lr-body')) { lrPintar(user, d.referidos || []); toast('Sin conexión: ves la lista guardada en este teléfono', 'err'); return; }
+    $('#lr-body').innerHTML = `<div class="card pad center stack"><p class="muted">Sin conexión. Tu lista no está guardada en este teléfono.</p>
+      <p class="small muted">Puedes anotar referidos nuevos: quedan en Pendientes por subir.</p>
+      <button class="btn btn-primary btn-block" id="lr-off-anotar">Anotar referido</button></div>`;
+    const b = $('#lr-off-anotar'); if (b && window.PEND) b.onclick = () => PEND.liderPendientes(user);
+  }
 }
 
 /* Pinta la vista con lo que haya (con referidos o vacía) y guarda la firma
@@ -2155,6 +2206,10 @@ function lrVolverTrasGuardar(user, r, accion, t0) {
 
 /* ---- NUEVO REFERIDO ---- */
 function liderNuevoReferido(user) {
+  /* 08/11/2026 · sin señal no se puede verificar el documento: se anota en Pendientes */
+  if (window.SINRED && !SINRED.enLinea() && window.PEND) {
+    return PEND.anotar({ dueno: user.documento, guardados: PEND.guardadosSet, titulo: 'Anotar sin señal' });
+  }
   RED.nuevaVista();   /* 12/10/2026 · Fase 4: corta lecturas de la sub-vista anterior */
   app.innerHTML = `${backLider('Nuevo referido')}<div class="pad stack"><div class="card pad stack">
     <p class="muted">Escribe el documento. Verificaremos si ya está registrado antes de continuar.</p>
@@ -3490,6 +3545,7 @@ function comMedia(src, reel) {
 
 
 function openMenu(id, user) {
+  if (id === 'anotador') return window.PEND && PEND.viewAnotador(user);   // 08/11/2026
   if (id === 'misdatos') return openMisDatos(user);   // 17/07/2026: modal solo-lectura
   if (id === 'noticias') return abrirPonteAlDia(user); // ajuste 20/07: puerta + avisos
   if (IMPLEMENTADAS.has(id)) return go(id);
@@ -3961,7 +4017,23 @@ function ntNoLeidas(items) {
 /* ============================================================
    ARRANQUE  (gate de instalación como SEP-GROUP)
    ============================================================ */
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+/* 08/11/2026 · regla de publicación (modo fresco): el SW se registra sin la
+   caché HTTP (updateViaCache 'none') y pide update() al cargar; si un SW nuevo
+   toma el control de una página que ya tenía uno, se recarga UNA vez por
+   versión (freno en sessionStorage). La primera instalación no recarga. */
+if ('serviceWorker' in navigator) window.addEventListener('load', () => {
+  const habia = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => { try { r.update(); } catch (e) {} }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!habia) return;
+    const k = nsKey('jp_sw_cc_' + (typeof APP_VERSION !== 'undefined' ? APP_VERSION : ''));
+    try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) { return; }
+    if (window.RED && RED.escriturasEnVuelo > 0) return;
+    const capa = document.getElementById('layer');
+    if (capa && capa.children.length) return;   /* no se recarga encima de una hoja abierta (se perdería lo escrito) */
+    location.reload();
+  });
+});
 async function initApp() {
   if (typeof APP_VERSION !== 'undefined' && APP_VERSION) { APP_VERSION_LOADED = String(APP_VERSION); paintVersion(APP_VERSION_LOADED); }
   /* 12/10/2026 · Fase 4: la versión se revisa al volver a la app (visibilitychange)
