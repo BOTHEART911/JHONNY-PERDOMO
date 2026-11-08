@@ -4049,6 +4049,7 @@ function casaPintar() {
       ${c.redesSub ? `<p class="casa-sub">${esc(c.redesSub)}</p>` : ''}
       <div class="casa-redes-g">
         ${c.redes.map(r => {
+          if (window.redLogo) return `<a class="casa-red" href="${esc(r.enlace)}" target="_blank" rel="noopener noreferrer">${redLogo(redTipo(r.enlace))}<span>${esc(r.nombre)}</span></a>`;
           const red = NT_REDES[ntRedDe(r.enlace)] || NT_REDES.web;
           return `<a class="nt-link ${red.cls}" href="${esc(r.enlace)}" target="_blank" rel="noopener noreferrer">${I[red.ico] || I.web} ${esc(r.nombre)}</a>`;
         }).join('')}
