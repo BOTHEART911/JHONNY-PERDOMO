@@ -369,7 +369,7 @@ const MENU = [
      "Mis Datos": abre un modal solo-lectura con la info de la persona.
      No navega a #/datos (esa vista sí edita y sigue viva por si acaso). */
   { id:'misdatos',  icon:'user',  title:'Mis Datos',             desc:'Revisa tu información' },
-  { id:'solicitud', icon:'help',  title:'Realiza tu solicitud',  desc:'Pide un servicio' },
+  { id:'solicitud', icon:'help',  title:'Solicitudes y Gestiones', desc:'Pide o consulta un servicio' },   // 07/11/2026
   { id:'ideas',     icon:'idea',  title:'Suma tus ideas',        desc:'Propón para ' + MV.municipio },
   { id:'noticias',  icon:'news',  title:'Ponte al día',          desc:'Últimas noticias' },
   { id:'casa',      icon:'home2', title:'Nuestra casa social',   desc:'Programación y redes' },
@@ -415,7 +415,7 @@ function render() {
   switch (route) {
     case 'tarjeta':   return viewTarjeta(user);
     case 'datos':     return viewDatos(user);
-    case 'solicitud': return viewSolicitud(user);
+    case 'solicitud': return window.viewGestiones ? viewGestiones(user) : viewSolicitud(user);   // 07/11/2026: Solicitudes y Gestiones
     case 'ideas':     return viewIdeas(user);
     case 'lideres':   return viewLideres(user);
     case 'comercio':  return viewComercio(user);

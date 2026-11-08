@@ -49,7 +49,9 @@
    'pub.liderServicios pub.liderCompromisos pub.liderSolicitudes pub.casa pub.emergencia ' +
    'priv.permCatalogo priv.configList priv.cfgPuestos priv.cfgPuestoImpacto priv.botEstado priv.botBlacklist ' +
    'priv.balances priv.liderBuscarDoc priv.liderAhijados priv.liderActivarInfo priv.iaEstado priv.iaModelos ' +
-   'priv.vozEstado priv.vozVoces priv.contactoBuscar pub.paquete')
+   'priv.vozEstado priv.vozVoces priv.contactoBuscar pub.paquete ' +
+   /* 07/11/2026: Solicitudes y Gestiones (lectura) */
+   'pub.misGestiones')
     .split(/\s+/).forEach(function (a) { if (a) LECTURAS[a] = true; });
 
   var T_LECTURA = 30000, T_ESCRITURA = 60000;
