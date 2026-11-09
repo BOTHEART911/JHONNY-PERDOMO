@@ -20,6 +20,7 @@
  *  PUB.refrescar(forzar)→ revalida (una vez por sesión, o siempre si forzar)
  *  PUB.alCambiar(fn)    → fn(partesQueCambiaron) tras una revalidación
  *  PUB.pedidor(fn)      → la app entrega su lector silencioso del CORE
+ *  PUB.parte(k)         → revalida solo /publico/<k> de Firebase (08/11/2026)
  * ============================================================================ */
 (function (raiz) {
   'use strict';
@@ -30,7 +31,7 @@
   var LS = NS + ':pub:v1';
   var FB = String((M.FIREBASE && M.FIREBASE.databaseURL) || M.FB_RTDB || '').replace(/\/+$/, '');
   var CANALES = ['config', 'notificaciones', 'analisis', 'lideres'];
-  var PARTES = ['marca', 'config', 'inicio', 'noticias', 'casa', 'emergencia', 'comercios', 'residencias', 'servicios'];
+  var PARTES = ['marca', 'config', 'inicio', 'noticias', 'casa', 'emergencia', 'comercios', 'residencias', 'servicios', 'vistas'];   /* 08/11/2026: + vistas (js/vistas-pub.js) */
   var VIEJO_MS = 12 * 3600 * 1000;
 
   var paq = null;            // {ts, rv, ...partes}
@@ -123,6 +124,20 @@
 
   function dato(k) { return paq ? paq[k] : undefined; }
 
+  /* 08/11/2026 · Revalida UNA parte leyendo solo /publico/<k> de Firebase (unos
+     pocos bytes, sin Apps Script). La usa js/vistas-pub.js al volver a la app. */
+  async function parte(k) {
+    if (PARTES.indexOf(k) < 0 || !paq) return;
+    try {
+      var v = await leerFb('publico/' + k);
+      if (v === null || v === undefined) return;
+      if (JSON.stringify(paq[k]) === JSON.stringify(v)) return;
+      paq[k] = v;
+      try { localStorage.setItem(LS, JSON.stringify(paq)); } catch (e) {}
+      subs.forEach(function (fn) { try { fn([k]); } catch (e) {} });
+    } catch (e) { /* sin red o Firebase cerrado: se queda lo guardado */ }
+  }
+
   /* Espera solo si no hay nada guardado de esa parte. */
   function listo(k) {
     if (paq && paq[k] !== undefined && paq[k] !== null) return Promise.resolve(paq[k]);
@@ -155,6 +170,7 @@
     listo: listo,
     o: o,
     refrescar: refrescar,
+    parte: parte,
     alCambiar: function (fn) { subs.push(fn); },
     pedidor: function (fn) { pedidor = fn; },
     medidas: function () { return medidas.slice(); },

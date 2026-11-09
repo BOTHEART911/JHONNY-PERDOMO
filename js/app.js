@@ -390,6 +390,10 @@ const IMPLEMENTADAS = new Set(['tarjeta', 'datos', 'solicitud', 'ideas', 'lidere
    RÚTER
    ============================================================ */
 function go(route) { location.hash = '#/' + route; }
+/* 08/11/2026 · Vistas encendibles (js/vistas-pub.js). Sin la pieza, todo encendido. */
+const VISTA_APAGADA_TXT = 'Esta sección no está disponible por ahora.';
+function vistaApagada(id) { return !!(window.VISTAS && VISTAS.apagada(id)); }
+function vistaApagadaRuta(ruta) { return !!(window.VISTAS && vistaApagada(VISTAS.deRuta(ruta))); }
 
 /* 23/07/2026 · Rutas que van anchas en PC. El ancho se decide con la ruta de
    DESTINO, antes de pintar. Antes se hacia appWide(false) al entrar a render() y
@@ -419,6 +423,13 @@ function render() {
   if (route === 'registro') return go('login');   // ajuste 20/07: sin auto-registro
   if (!user && route !== 'login') return go('login');
   if (route === 'login' || !user) return viewLogin();
+  /* 08/11/2026 · Vista apagada desde la privada (js/vistas-pub.js): por enlace
+     directo no abre; vuelve al Inicio sin dejar rastro en el historial. */
+  if (vistaApagadaRuta(route)) {
+    history.replaceState(null, '', location.pathname + location.search + '#/home');
+    toast(VISTA_APAGADA_TXT);
+    return render();
+  }
   switch (route) {
     case 'tarjeta':   return viewTarjeta(user);
     case 'datos':     return viewDatos(user);
@@ -696,14 +707,14 @@ async function viewHome(user) {
   const cacheLider = esLiderCache(user);
   const esLider = cacheLider === true;   // sin dato todavía: se pinta sin la baldosa y se suma al llegar
   const soloLider = new Set(['lideres']);
-  const menu = MENU.filter(m => !soloLider.has(m.id) || esLider);
+  const menu = MENU.filter(m => (!soloLider.has(m.id) || esLider) && !vistaApagada(m.id));   // 08/11/2026: vistas apagadas no salen
 
   app.innerHTML = `${appbar(user)}<div class="pad stack"><div><p class="eyebrow">${esc(MV.lema)}</p><h1 class="h1">Hola, ${esc(primerNombre(user.nombre))} 👋🏾</h1><span class="plan-badge ${plan.premium ? 'premium' : ''}">${esc(plan.label)}</span></div><div id="inicio"><div class="hero"><div class="skeleton" style="aspect-ratio:16/10;"></div></div></div><div id="banner"></div><p class="eyebrow" style="margin-top:6px;">Explora</p><div class="menu-grid">${menu.map(m => `<button class="tile ${m.gold ? 'gold' : ''} ${m.wide ? 'wide' : ''}" data-id="${m.id}"><span class="ico">${I[m.icon]}</span><span class="txt"><b>${esc(m.title)}</b><br><span>${esc(m.desc)}</span></span></button>`).join('')}</div><p class="center small muted" style="margin-top:10px;">${esc(MV.candidato)} · ${esc(MV.lugar)}</p></div>`;
   app.hidden = false; hideSplash(); bindAppbar(user); appWide(true);   /* 23/07: Inicio se expande en PC */
   /* 08/11/2026 · ANOTADOR SIN CONEXIÓN: para el líder sin sesión guardada en el
      teléfono. Solo escribe (nunca muestra datos); al entrar a su zona con la
      contraseña lo anotado pasa a sus Pendientes por subir. */
-  if (esLider && window.PEND && !liderSesLeer(user.documento)) {
+  if (esLider && window.PEND && !liderSesLeer(user.documento) && !vistaApagada('lideres')) {
     const g = app.querySelector('.menu-grid');
     const n = window.SINRED ? SINRED.contar('anon') : 0;
     if (g) g.insertAdjacentHTML('beforeend', `<button class="tile" data-id="anotador"><span class="ico">${I.pencil}</span><span class="txt"><b>Anotador sin conexión</b>${n ? `<span class="sr-badge">${n}</span>` : ''}<br><span>Anota referidos sin señal; se pasan a tu zona</span></span></button>`);
@@ -3545,6 +3556,7 @@ function comMedia(src, reel) {
 
 
 function openMenu(id, user) {
+  if (vistaApagada(id === 'anotador' ? 'lideres' : id)) return toast(VISTA_APAGADA_TXT);   // 08/11/2026
   if (id === 'anotador') return window.PEND && PEND.viewAnotador(user);   // 08/11/2026
   if (id === 'misdatos') return openMisDatos(user);   // 17/07/2026: modal solo-lectura
   if (id === 'noticias') return abrirPonteAlDia(user); // ajuste 20/07: puerta + avisos
@@ -4046,8 +4058,13 @@ async function initApp() {
     if (cambios.indexOf('config') >= 0) usarConfig(PUB.dato('config'));
     if (cambios.indexOf('residencias') >= 0) _resiCache = null;
     if (cambios.indexOf('servicios') >= 0) _serviCache = null;
-    if (layer.children.length) return;   // no se repinta encima de una hoja abierta
     const ruta = (location.hash.replace(/^#\//, '') || '').split('?')[0];
+    /* 08/11/2026 · vistas: si la abierta se apagó vuelve al Inicio (render la
+       saca); si estamos en el Inicio, se repintan las baldosas. Un aviso
+       (toast) en la capa no lo frena; una hoja abierta sí. */
+    if (cambios.indexOf('vistas') >= 0 && getActive() && !document.body.classList.contains('sheet-open') &&
+        (ruta === '' || ruta === 'home' || vistaApagadaRuta(ruta))) return render();
+    if (layer.children.length) return;   // no se repinta encima de una hoja abierta
     const toca = { '': 'inicio', home: 'inicio', noticias: 'noticias', casa: 'casa', emergencia: 'emergencia' }[ruta];
     if (toca && cambios.indexOf(toca) >= 0 && getActive()) render();
   });
