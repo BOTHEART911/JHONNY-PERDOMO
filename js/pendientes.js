@@ -29,7 +29,8 @@
   }
   function offResiGuardar(l) { try { localStorage.setItem(OFF_RESI, JSON.stringify(l || [])); } catch (e) {} }
   async function barrios() {
-    try { const l = await getResidencias(); if (l && l.length) { offResiGuardar(l); return l; } } catch (e) {}
+    /* 08/11/2026 · sin señal no se espera a la red (reintentos): la copia del teléfono de una vez */
+    if (SR.enLinea()) try { const l = await getResidencias(); if (l && l.length) { offResiGuardar(l); return l; } } catch (e) {}
     try { return JSON.parse(localStorage.getItem(OFF_RESI) || '[]'); } catch (e) { return []; }
   }
 
@@ -48,6 +49,16 @@
 
   /* ---------- montaje de la tira ---------- */
   function dueno() { return (typeof LIDER !== 'undefined' && LIDER && LIDER.documento) || 'anon'; }
+  /* 08/11/2026 · la lista de barrios queda en el teléfono desde que se abre
+     con señal (una vez al día, de fondo): así el anotador sirve sin red aunque
+     nunca se haya abierto antes. */
+  setTimeout(function () {
+    try {
+      const t = Number(localStorage.getItem(OFF_RESI + ':t') || 0);
+      if (!SR.enLinea() || !getActive() || Date.now() - t < 864e5) return;
+      barrios().then(l => { if (l && l.length) try { localStorage.setItem(OFF_RESI + ':t', String(Date.now())); } catch (e) {} });
+    } catch (e) {}
+  }, 4000);
   SR.montar({
     dueno: dueno,
     textoSin: 'Sin conexión',
