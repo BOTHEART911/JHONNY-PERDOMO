@@ -64,6 +64,11 @@
       try { res.act = data.actz ? await descomprimir(data.actz) : data.act; } catch (e) { res.act = null; }
     }
     if (res && typeof res === 'object' && data.actRv) res.rv = Object.assign({}, res.rv || {}, data.actRv);
+    /* 12/11/2026 · validación de registros (pub.liderReferidos pc=1): la lista
+       POR CONFIRMAR viaja al lado: pc (en claro) o pcz (comprimida). */
+    if (res && typeof res === 'object' && (data.pcz || data.pc) && !res.pc) {
+      try { res.pc = data.pcz ? await descomprimir(data.pcz) : data.pc; } catch (e) { res.pc = null; }
+    }
     return res;
   }
 

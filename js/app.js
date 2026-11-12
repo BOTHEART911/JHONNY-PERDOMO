@@ -87,8 +87,10 @@ const LZ_ZONA = new Set(('pub.rev pub.liderAsignar pub.liderReferidos pub.liderM
   'pub.liderServicios pub.servResponder pub.servEliminar pub.servEnviarResp pub.servExcel pub.servAgregar ' +
   'pub.servNuevaSolicitud pub.esProfesional ' +
   'pub.liderPendRevisar pub.liderNuevoLote ' +   /* 08/11/2026 · pendientes sin conexión */
-  'pub.liderTrazabilidad pub.liderTrazabilidadLote').split(' '));   /* 12/11/2026 · trazabilidad del referido */
-const LZ_CON_DEV = new Set(['pub.liderMarcar', 'pub.liderEditarRef', 'pub.liderNuevoRef', 'pub.liderAsignar', 'pub.liderCeder', 'pub.liderNuevoLote']);
+  'pub.liderTrazabilidad pub.liderTrazabilidadLote ' +   /* 12/11/2026 · trazabilidad del referido */
+  'pub.pcLista pub.pcVisto pub.pcFallecido pub.pcEditar').split(' '));   /* 12/11/2026 · validación de registros (antes POSTCONSULTA) */
+const LZ_CON_DEV = new Set(['pub.liderMarcar', 'pub.liderEditarRef', 'pub.liderNuevoRef', 'pub.liderAsignar', 'pub.liderCeder', 'pub.liderNuevoLote',
+  'pub.pcVisto', 'pub.pcFallecido', 'pub.pcEditar']);
 const DEV_ID = (() => { try { let d = localStorage.getItem(nsKey('jp_dev')); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem(nsKey('jp_dev'), d); } return d; } catch { return ''; } })();
 function conPase(action, params, body, method) {
   const extra = {};
@@ -1203,7 +1205,7 @@ function liderPanelPintar(user, esProf) {
    (/meta/bd_rev) dice si hay algo más nuevo y solo entonces se pide. */
 const lrClaveCache = () => 'pub.liderReferidos:' + (LR_COMO || 'yo');
 async function lrPedir(user) {
-  const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1' }, RAP.params())));
+  const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1', pc: '1' }, RAP.params())));
   const d = await RAP.abrir(r);
   if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
   /* 08/11/2026 · si el líder se preparó para salir sin señal, la copia se renueva */
@@ -1218,7 +1220,7 @@ function lrPrecargar(user) {
   if (LR_PRE || RAP.tomar(lrClaveCache())) return;
   LR_PRE = (async () => {
     try {
-      const r = await apiFondo('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1' }, RAP.params())));
+      const r = await apiFondo('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1', pc: '1' }, RAP.params())));
       const d = await RAP.abrir(r);
       if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
     } catch (e) {} finally { LR_PRE = null; }
@@ -1228,6 +1230,7 @@ async function liderReferidos(user) {
   RED.nuevaVista();
   LR_MUN = ''; LR_MUNS_TODOS = false;   // 01/09: cada entrada arranca sin filtro de municipio
   if (window.LRT) LRT.reiniciar();       // 12/11: y sin filtro de actividad
+  if (window.LRVAL) LRVAL.reiniciar();   // 12/11: y sin filtro en la validación
   RAP.setUsuario(user.documento);
   let enCache = RAP.tomar(lrClaveCache()) || await RAP.revivir(lrClaveCache());
   /* 08/11/2026 · sin señal y sin nada en la sesión: la copia de "Prepararme" */
@@ -1283,11 +1286,12 @@ function lrPintar(user, referidos) {
     const vacio = LR_COMO
       ? `<p class="muted">Este líder todavía no tiene referidos. Usa <b>Nuevo referido</b> para sumarle los suyos.</p>`
       : `<p class="muted">Aún no tienes referidos. Usa <b>Nuevo referido</b> para sumar a los tuyos.</p>`;
-    $('#lr-body').innerHTML = `${lrBannerHtml()}<div class="card pad center">${vacio}<button class="btn btn-primary btn-block" id="lr-nuevo" style="margin-top:12px;">+ Nuevo referido</button></div>`;
+    $('#lr-body').innerHTML = `${lrBannerHtml()}<div id="lr-val" hidden></div><div class="card pad center">${vacio}<button class="btn btn-primary btn-block" id="lr-nuevo" style="margin-top:12px;">+ Nuevo referido</button></div>`;
     $('#lr-body').insertAdjacentHTML('beforeend', lrAhijadosBtnHtml() + lrMemoriaBtn());   // 01/08: sin referidos hoy, pero puede tener meses cerrados
     $('#lr-nuevo').onclick = () => liderNuevoReferido(user);
     { const bm = $('#lr-memoria'); if (bm) bm.onclick = () => liderMemoria(user); }
     lrBindPadrino(user);
+    if (window.LRVAL) LRVAL.pintar();   // 12/11: puede tener por validar de sus ahijados
     return;
   }
   pintarReferidos(user, referidos);
@@ -1708,6 +1712,7 @@ let LR_ACT = null, LR_USER = null;
 function lrDato(r) {
   LR_ACT = (r && r.act && typeof r.act === 'object') ? r.act : null;
   if (window.LRT) LRT.dato(LR_ACT);
+  if (window.LRVAL) LRVAL.dato(r && r.pc);   // 12/11: POR CONFIRMAR viaja con la lista (antes POSTCONSULTA)
 }
 function lrQ() { const qEl = $('#lr-q'); return qEl ? norm(qEl.value) : ''; }
 function lrPasaQ(rf, q) { return !q || norm(String(rf.nombre || '') + ' ' + String(rf.documento || '')).includes(q); }
@@ -1728,12 +1733,13 @@ function pintarReferidos(user, referidos) {
      Ahora: cabecera y las primeras 60 tarjetas de una; el resto entra por
      tandas sin congelar, y UN solo manejador en la lista atiende todo. */
   const PRIMERAS = 60, TANDA = 150;
-  $('#lr-body').innerHTML = `${lrBannerHtml()}${header}${contador}<div class="lr-tend" id="lr-tend" hidden></div>${lrAhijadosBtnHtml()}${lrMemoriaBtn()}<div class="lr-muns" id="lr-muns"></div><div class="bd-chips bd-chips-act" id="lr-act" hidden></div><div class="bd-chips bd-chips-act2" id="lr-act2" hidden></div><div class="ref-grid" id="lr-list">${referidos.slice(0, PRIMERAS).map(rf => referidoCard(rf)).join('')}</div>`;
+  $('#lr-body').innerHTML = `${lrBannerHtml()}<div id="lr-val" hidden></div>${header}${contador}<div class="lr-tend" id="lr-tend" hidden></div>${lrAhijadosBtnHtml()}${lrMemoriaBtn()}<div class="lr-muns" id="lr-muns"></div><div class="bd-chips bd-chips-act" id="lr-act" hidden></div><div class="bd-chips bd-chips-act2" id="lr-act2" hidden></div><div class="ref-grid" id="lr-list">${referidos.slice(0, PRIMERAS).map(rf => referidoCard(rf)).join('')}</div>`;
   $('#lr-nuevo').onclick = () => liderNuevoReferido(user);
   { const bm = $('#lr-memoria'); if (bm) bm.onclick = () => liderMemoria(user); }   // 01/08
   lrBindPadrino(user);
   lrPintarMuns();                     // 01/09: pastillas de municipio
   if (window.LRT) LRT.pintar();       // 12/11: franja de crecimiento + fila de actividad
+  if (window.LRVAL) LRVAL.pintar();   // 12/11: validación de registros (solo si hay POR CONFIRMAR)
   if (window.LTZ && LR_ACT) LTZ.observar();   // 12/11: precarga de la trazabilidad de lo que se ve
   $('#lr-q').addEventListener('input', e => { lrAplicar(); });
   const lista = $('#lr-list');
@@ -1752,6 +1758,7 @@ function pintarReferidos(user, referidos) {
       case 'tel':      return window.open('tel:' + onlyDig(rf.contacto), '_self');
       case 'foto':     return zoomImagen(refFoto(rf));   // 25/07
       case 'traza':    return window.LTZ && LTZ.abrir(rf);   // 12/11: trazabilidad
+      case 'validar':  return window.LRVAL && LRVAL.validar(rf);   // 12/11: validación (antes POSTCONSULTA)
     }
   });
   /* El resto por tandas (cada una en su propio cuadro). Si la vista cambió
@@ -1923,6 +1930,7 @@ function referidoCard(rf) {
       <div class="rc-id"><b>${esc(rf.nombre)}</b><span>CC ${esc(rf.documento)}${lugar ? ' · ' + esc(lugar) : ''}</span></div>
       ${LR_ACT ? `<button class="rc-info" data-act="traza" title="Trazabilidad" aria-label="Ver la trazabilidad de ${esc(rf.nombre)}">${I.info}</button>` : ''}
     </div>
+    ${window.LRVAL ? LRVAL.sello(rf) : ''}
     <div class="rc-badges">${refBadgesHtml(rf)}</div>
     <div class="rc-actions">
       <button class="rc-btn" data-act="asis">🏷 Asistencia</button>
@@ -2199,16 +2207,19 @@ function lrVivoTocar() {
 async function lrVivoRefrescar() {
   if (!lrVivoVivo()) return;
   try {
-    const r0 = await apiSilencio('pub.liderReferidos', lrCtx(Object.assign({ documento: LRV.user.documento, act: '1' }, RAP.params())));
+    const r0 = await apiSilencio('pub.liderReferidos', lrCtx(Object.assign({ documento: LRV.user.documento, act: '1', pc: '1' }, RAP.params())));
     const r = await RAP.abrir(r0);
     if (!r || !r.ok || !lrVivoVivo()) return;
     RAP.guardar(lrClaveCache(), r, (r0 && r0.fmt === 2) ? r0 : null);
     LRV.tsLista = Math.max(LRV.tsLista || 0, Number(r.rv && r.rv.bd) || 0);
     const actCambio = window.LRT && LRT.firma(r.act) !== LRT.firma(LR_ACT);
+    const pcCambio = window.LRVAL && r.pc && LRVAL.firma(r.pc) !== LRV.pcSig;   // 12/11: por validar (p. ej. de un ahijado)
     if (lrFirma(r.referidos) === LRV.sig) {            // nada cambió en la lista de mi grupo
-      if (actCambio) { lrDato(r); if (window.LRT) LRT.pintar(); }   // 12/11: solo la actividad
+      if (actCambio || pcCambio) { lrDato(r); if (window.LRT) LRT.pintar(); if (window.LRVAL) LRVAL.repintar(); }   // 12/11: solo la actividad / la validación
+      if (window.LRVAL && r.pc) LRV.pcSig = LRVAL.firma(r.pc);
       return;
     }
+    if (window.LRVAL && r.pc) LRV.pcSig = LRVAL.firma(r.pc);
     lrDato(r);
     if (r.opciones) LIDER.opciones = r.opciones;
     const q = ($('#lr-q') && $('#lr-q').value) || '';
