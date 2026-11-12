@@ -3886,13 +3886,19 @@ if ('serviceWorker' in navigator) {
   /* Modo fresco también para el SW de avisos: sin la caché HTTP y con update()
      al cargar, para que lo publicado (incluido cómo se abre el aviso) llegue en
      la primera apertura y no a las 24 h. Solo si este equipo ya tiene avisos. */
-  window.addEventListener('load', () => {
+  /* 12/11/2026 · también al VOLVER a la app (instalada que quedó en segundo
+     plano días enteros nunca dispara 'load'); máximo una vez cada 5 min. */
+  let ntSwRev = 0;
+  const ntSwAvisosAlDia = () => {
     try {
       if (ntPermiso() !== 'granted' || !ntTokenLocal()) return;
+      if (Date.now() - ntSwRev < 300000) return; ntSwRev = Date.now();
       navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: NT_SW_SCOPE, updateViaCache: 'none' })
         .then(r => { try { r.update(); } catch (e) {} }).catch(() => {});
     } catch (e) {}
-  });
+  };
+  window.addEventListener('load', ntSwAvisosAlDia);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ntSwAvisosAlDia(); });
 }
 
 function ntPlataforma() {
