@@ -53,7 +53,9 @@
    /* 07/11/2026: Solicitudes y Gestiones (lectura) */
    'pub.misGestiones ' +
    /* 08/11/2026: pendientes sin conexión (revisar documentos, solo lectura) */
-   'pub.liderPendRevisar priv.bdPendRevisar')
+   'pub.liderPendRevisar priv.bdPendRevisar ' +
+   /* 12/11/2026: Mis referidos → trazabilidad de un referido (solo lectura) */
+   'pub.liderTrazabilidad pub.liderTrazabilidadLote')
     .split(/\s+/).forEach(function (a) { if (a) LECTURAS[a] = true; });
 
   var T_LECTURA = 30000, T_ESCRITURA = 60000;

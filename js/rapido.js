@@ -55,7 +55,16 @@
   async function abrir(data) {
     if (!data || data.fmt !== 2) return data;
     var o = data.gz ? await descomprimir(data.gz) : data;
-    return (o && o.fmt === 2 && o.filas) ? rehidratar(o) : o;
+    var res = (o && o.fmt === 2 && o.filas) ? rehidratar(o) : o;
+    /* 12/11/2026 · pieza que viaja AL LADO de la lista (pub.liderReferidos
+       act=1, igual que priv.baseDatos en PRIV): act (en claro) o actz
+       (comprimida aparte) + actRv, el sello de sus canales, que se suma al rv.
+       Si la pieza no abre, la lista sale igual. */
+    if (res && typeof res === 'object' && (data.actz || data.act)) {
+      try { res.act = data.actz ? await descomprimir(data.actz) : data.act; } catch (e) { res.act = null; }
+    }
+    if (res && typeof res === 'object' && data.actRv) res.rv = Object.assign({}, res.rv || {}, data.actRv);
+    return res;
   }
 
   /* ---- caché ---- */

@@ -210,7 +210,7 @@
     if (!SR.enLinea()) return toast('Necesitas señal para prepararte', 'err');
     if (btn) saving(btn, true);
     try {
-      const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento }, RAP.params())));
+      const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1' }, RAP.params())));
       const d = await RAP.abrir(r);
       if (!d || !d.ok) throw new Error((d && d.msg) || 'No se pudo bajar tu lista');
       RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);

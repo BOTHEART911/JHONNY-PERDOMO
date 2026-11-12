@@ -86,7 +86,8 @@ const LZ_ZONA = new Set(('pub.rev pub.liderAsignar pub.liderReferidos pub.liderM
   'pub.liderInsights pub.padrinoEntrar pub.liderBalances pub.liderBalanceVer pub.liderBalancePdf pub.liderBalanceXlsx ' +
   'pub.liderServicios pub.servResponder pub.servEliminar pub.servEnviarResp pub.servExcel pub.servAgregar ' +
   'pub.servNuevaSolicitud pub.esProfesional ' +
-  'pub.liderPendRevisar pub.liderNuevoLote').split(' '));   /* 08/11/2026 · pendientes sin conexión */
+  'pub.liderPendRevisar pub.liderNuevoLote ' +   /* 08/11/2026 · pendientes sin conexión */
+  'pub.liderTrazabilidad pub.liderTrazabilidadLote').split(' '));   /* 12/11/2026 · trazabilidad del referido */
 const LZ_CON_DEV = new Set(['pub.liderMarcar', 'pub.liderEditarRef', 'pub.liderNuevoRef', 'pub.liderAsignar', 'pub.liderCeder', 'pub.liderNuevoLote']);
 const DEV_ID = (() => { try { let d = localStorage.getItem(nsKey('jp_dev')); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem(nsKey('jp_dev'), d); } return d; } catch { return ''; } })();
 function conPase(action, params, body, method) {
@@ -1202,7 +1203,7 @@ function liderPanelPintar(user, esProf) {
    (/meta/bd_rev) dice si hay algo más nuevo y solo entonces se pide. */
 const lrClaveCache = () => 'pub.liderReferidos:' + (LR_COMO || 'yo');
 async function lrPedir(user) {
-  const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento }, RAP.params())));
+  const r = await api('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1' }, RAP.params())));
   const d = await RAP.abrir(r);
   if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
   /* 08/11/2026 · si el líder se preparó para salir sin señal, la copia se renueva */
@@ -1217,7 +1218,7 @@ function lrPrecargar(user) {
   if (LR_PRE || RAP.tomar(lrClaveCache())) return;
   LR_PRE = (async () => {
     try {
-      const r = await apiFondo('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento }, RAP.params())));
+      const r = await apiFondo('pub.liderReferidos', lrCtx(Object.assign({ documento: user.documento, act: '1' }, RAP.params())));
       const d = await RAP.abrir(r);
       if (d && d.ok) RAP.guardar(lrClaveCache(), d, (r && r.fmt === 2) ? r : null);
     } catch (e) {} finally { LR_PRE = null; }
@@ -1226,6 +1227,7 @@ function lrPrecargar(user) {
 async function liderReferidos(user) {
   RED.nuevaVista();
   LR_MUN = ''; LR_MUNS_TODOS = false;   // 01/09: cada entrada arranca sin filtro de municipio
+  if (window.LRT) LRT.reiniciar();       // 12/11: y sin filtro de actividad
   RAP.setUsuario(user.documento);
   let enCache = RAP.tomar(lrClaveCache()) || await RAP.revivir(lrClaveCache());
   /* 08/11/2026 · sin señal y sin nada en la sesión: la copia de "Prepararme" */
@@ -1240,8 +1242,10 @@ async function liderReferidos(user) {
     const r = enCache.data;
     LIDER.opciones = r.opciones || LIDER.opciones;
     if (r.gestion) { LR_GESTION = r.gestion; }
+    lrDato(r);
     lrPintar(user, r.referidos || []);
     lrVivoStart(user, (enCache.rv && enCache.rv.bd) || 0);
+    if (window.LRT) LRT.vivo(enCache.rv || r.rv);
     return;
   }
   try {
@@ -1254,12 +1258,14 @@ async function liderReferidos(user) {
     }
     LIDER.opciones = r.opciones;
     if (r.gestion) { LR_GESTION = r.gestion; if (LR_COMO && r.gestion.nombre) LR_GESTION.nombre = r.gestion.nombre; }
+    lrDato(r);
     lrPintar(user, r.referidos);
     lrVivoStart(user, (r.rv && r.rv.bd) || 0);          // 22/07: la vista queda EN VIVO
+    if (window.LRT) LRT.vivo(r.rv);                     // 12/11: y escucha los canales de la actividad
   } catch (e) {
     /* 08/11/2026 · se cayó la red: lo que haya en el teléfono, o el camino a Pendientes */
     const d = (!LR_COMO && window.PEND) ? await PEND.offRefLeer(user.documento) : null;
-    if (d && d.ok && $('#lr-body')) { lrPintar(user, d.referidos || []); toast('Sin conexión: ves la lista guardada en este teléfono', 'err'); return; }
+    if (d && d.ok && $('#lr-body')) { lrDato(d); lrPintar(user, d.referidos || []); toast('Sin conexión: ves la lista guardada en este teléfono', 'err'); return; }
     $('#lr-body').innerHTML = `<div class="card pad center stack"><p class="muted">Sin conexión. Tu lista no está guardada en este teléfono.</p>
       <p class="small muted">Puedes anotar referidos nuevos: quedan en Pendientes por subir.</p>
       <button class="btn btn-primary btn-block" id="lr-off-anotar">Anotar referido</button></div>`;
@@ -1412,6 +1418,7 @@ function lrAplicarFila(lista, fila, quitar) {
   const i = lista.findIndex(x => String(x.documento) === doc);
   if (quitar) { if (i >= 0) lista.splice(i, 1); return null; }
   if (i >= 0) { Object.assign(lista[i], fila); return lista[i]; }
+  if (!fila.fr) { const h = new Date(); fila.fr = String(h.getDate()).padStart(2, '0') + '/' + String(h.getMonth() + 1).padStart(2, '0') + '/' + h.getFullYear(); }   // 12/11: entra a la tendencia del mes
   lista.unshift(fila);
   return fila;
 }
@@ -1690,8 +1697,25 @@ async function liderMemoriaVer(user, mes) {
   } catch (e) { closeLayer(); toast('Error de conexión', 'err'); }
 }
 
+/* ============================================================
+   12/11/2026 · CRECIMIENTO + ACTIVIDAD + TRAZABILIDAD (lr-tablero.js,
+   lr-traza.js). La pieza de actividad viaja con la lista (act=1) y solo
+   trae lo del grupo; sin ella (CORE anterior) no se pinta nada nuevo.
+   lrPasaQ / lrPasaMun son las reglas de la lista: las usan las tarjetas,
+   los conteos de actividad y la tendencia, así todo cuadra.
+   ============================================================ */
+let LR_ACT = null, LR_USER = null;
+function lrDato(r) {
+  LR_ACT = (r && r.act && typeof r.act === 'object') ? r.act : null;
+  if (window.LRT) LRT.dato(LR_ACT);
+}
+function lrQ() { const qEl = $('#lr-q'); return qEl ? norm(qEl.value) : ''; }
+function lrPasaQ(rf, q) { return !q || norm(String(rf.nombre || '') + ' ' + String(rf.documento || '')).includes(q); }
+function lrPasaMun(rf) { return !LR_MUN || lrMunClave(rf.municipio) === LR_MUN; }
+
 function pintarReferidos(user, referidos) {
   LR_REFS = referidos || [];
+  LR_USER = user;
   const header = `<div class="lr-head">
     <div class="lr-search"><input class="input" id="lr-q" placeholder="Buscar por nombre o documento…" autocomplete="off" /></div>
     <button class="btn btn-primary" id="lr-nuevo" style="white-space:nowrap;">+ Nuevo referido</button>
@@ -1704,11 +1728,13 @@ function pintarReferidos(user, referidos) {
      Ahora: cabecera y las primeras 60 tarjetas de una; el resto entra por
      tandas sin congelar, y UN solo manejador en la lista atiende todo. */
   const PRIMERAS = 60, TANDA = 150;
-  $('#lr-body').innerHTML = `${lrBannerHtml()}${header}${contador}${lrAhijadosBtnHtml()}${lrMemoriaBtn()}<div class="lr-muns" id="lr-muns"></div><div class="ref-grid" id="lr-list">${referidos.slice(0, PRIMERAS).map(rf => referidoCard(rf)).join('')}</div>`;
+  $('#lr-body').innerHTML = `${lrBannerHtml()}${header}${contador}<div class="lr-tend" id="lr-tend" hidden></div>${lrAhijadosBtnHtml()}${lrMemoriaBtn()}<div class="lr-muns" id="lr-muns"></div><div class="bd-chips bd-chips-act" id="lr-act" hidden></div><div class="bd-chips bd-chips-act2" id="lr-act2" hidden></div><div class="ref-grid" id="lr-list">${referidos.slice(0, PRIMERAS).map(rf => referidoCard(rf)).join('')}</div>`;
   $('#lr-nuevo').onclick = () => liderNuevoReferido(user);
   { const bm = $('#lr-memoria'); if (bm) bm.onclick = () => liderMemoria(user); }   // 01/08
   lrBindPadrino(user);
   lrPintarMuns();                     // 01/09: pastillas de municipio
+  if (window.LRT) LRT.pintar();       // 12/11: franja de crecimiento + fila de actividad
+  if (window.LTZ && LR_ACT) LTZ.observar();   // 12/11: precarga de la trazabilidad de lo que se ve
   $('#lr-q').addEventListener('input', e => { lrAplicar(); });
   const lista = $('#lr-list');
   const porDoc = new Map(referidos.map(x => [String(x.documento), x]));
@@ -1725,13 +1751,14 @@ function pintarReferidos(user, referidos) {
       case 'wa':       return window.open('https://wa.me/57' + onlyDig(rf.contacto), '_blank');
       case 'tel':      return window.open('tel:' + onlyDig(rf.contacto), '_self');
       case 'foto':     return zoomImagen(refFoto(rf));   // 25/07
+      case 'traza':    return window.LTZ && LTZ.abrir(rf);   // 12/11: trazabilidad
     }
   });
   /* El resto por tandas (cada una en su propio cuadro). Si la vista cambió
      o se repintó, la tanda vieja no toca nada. */
   const yo = lista;
   let i = PRIMERAS;
-  const filtro = () => (($('#lr-q') && $('#lr-q').value) || LR_MUN);
+  const filtro = () => (($('#lr-q') && $('#lr-q').value) || LR_MUN || (window.LRT && LRT.estado().sel));
   const siguiente = () => {
     if (!yo.isConnected || i >= referidos.length) { if (yo.isConnected && filtro()) lrAplicar(); return; }
     yo.insertAdjacentHTML('beforeend', referidos.slice(i, i + TANDA).map(rf => referidoCard(rf)).join(''));
@@ -1804,11 +1831,14 @@ function lrPintarMuns() {
 function lrAplicar() {
   const qEl = $('#lr-q');
   const q = qEl ? norm(qEl.value) : '';
+  const conAct = !!(window.LRT && LRT.estado().sel);
   $$('#lr-list .rcard').forEach(c => {
     const okQ = !q || norm(c.dataset.search).includes(q);
     const okM = !LR_MUN || lrMunClave(c.dataset.mun) === LR_MUN;
-    c.style.display = (okQ && okM) ? '' : 'none';
+    const okA = !conAct || LRT.pasa({ documento: c.dataset.doc });   // 12/11: filtro de actividad
+    c.style.display = (okQ && okM && okA) ? '' : 'none';
   });
+  if (window.LRT) LRT.pintar();
 }
 
 /* 31/08 · engancha el aviso naranja y el selector de ahijados si están */
@@ -1891,6 +1921,7 @@ function referidoCard(rf) {
     <div class="rcard-top">
       ${av}
       <div class="rc-id"><b>${esc(rf.nombre)}</b><span>CC ${esc(rf.documento)}${lugar ? ' · ' + esc(lugar) : ''}</span></div>
+      ${LR_ACT ? `<button class="rc-info" data-act="traza" title="Trazabilidad" aria-label="Ver la trazabilidad de ${esc(rf.nombre)}">${I.info}</button>` : ''}
     </div>
     <div class="rc-badges">${refBadgesHtml(rf)}</div>
     <div class="rc-actions">
@@ -2093,6 +2124,7 @@ function lrVivoStop() {
   if (LRV.ref && LRV.cb) { try { LRV.ref.off('value', LRV.cb); } catch (e) {} }
   if (LRV.t) clearTimeout(LRV.t);
   if (LRV.poll) clearInterval(LRV.poll);
+  if (window.LRT) LRT.vivoParar();   // 12/11
   LRV = { on: false, user: null, ref: null, cb: null, primer: true, t: null, poll: null, ts: 0, sig: '' };
   window.__lrTeardown = null;
 }
@@ -2167,12 +2199,17 @@ function lrVivoTocar() {
 async function lrVivoRefrescar() {
   if (!lrVivoVivo()) return;
   try {
-    const r0 = await apiSilencio('pub.liderReferidos', lrCtx(Object.assign({ documento: LRV.user.documento }, RAP.params())));
+    const r0 = await apiSilencio('pub.liderReferidos', lrCtx(Object.assign({ documento: LRV.user.documento, act: '1' }, RAP.params())));
     const r = await RAP.abrir(r0);
     if (!r || !r.ok || !lrVivoVivo()) return;
     RAP.guardar(lrClaveCache(), r, (r0 && r0.fmt === 2) ? r0 : null);
     LRV.tsLista = Math.max(LRV.tsLista || 0, Number(r.rv && r.rv.bd) || 0);
-    if (lrFirma(r.referidos) === LRV.sig) return;      // nada cambió para mi grupo
+    const actCambio = window.LRT && LRT.firma(r.act) !== LRT.firma(LR_ACT);
+    if (lrFirma(r.referidos) === LRV.sig) {            // nada cambió en la lista de mi grupo
+      if (actCambio) { lrDato(r); if (window.LRT) LRT.pintar(); }   // 12/11: solo la actividad
+      return;
+    }
+    lrDato(r);
     if (r.opciones) LIDER.opciones = r.opciones;
     const q = ($('#lr-q') && $('#lr-q').value) || '';
     const y = window.scrollY;
