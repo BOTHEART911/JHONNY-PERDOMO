@@ -240,6 +240,7 @@
     esLectura: esLectura,
     sesion: function (fn) { proveedorSesion = fn; },
     medidas: function () { return medidas.slice(); },
+    anotar: function (m) { try { medidas.push(Object.assign({ t: Date.now() }, m)); if (medidas.length > 300) medidas.shift(); } catch (e) {} },
     tabla: function () { try { console.table(medidas.slice(-40)); } catch (e) {} },
     get escriturasEnVuelo() { return escriturasEnVuelo; }
   };

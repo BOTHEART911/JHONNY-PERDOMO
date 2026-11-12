@@ -409,6 +409,7 @@ const RUTAS_ANCHAS = new Set(['', 'home', 'solicitud', 'ideas', 'casa', 'emergen
 /* Ensancha el contenedor en vistas con grid (referidos/servicios) */
 function appWide(on) { document.body.classList.toggle('wide', !!on); }
 window.addEventListener('hashchange', render);
+function trasLogin() { let r = ''; try { r = sessionStorage.getItem(nsKey('jp_tras_login')) || ''; sessionStorage.removeItem(nsKey('jp_tras_login')); } catch (e) {} return r === 'noticias' ? 'noticias' : 'home'; }
 function render() {
   RED.nuevaVista();   /* 12/10/2026 · corta lecturas de la vista que se va */
   const route = (location.hash.replace(/^#\//, '') || '').split('?')[0];
@@ -424,6 +425,8 @@ function render() {
   if (route === 'instalar' && isStandalone()) { history.replaceState(null, '', location.pathname + location.search + '#/'); return render(); }
   if (route === 'instalar') return viewInstalar();
   if (route === 'registro') return go('login');   // ajuste 20/07: sin auto-registro
+  /* 12/11/2026 · si se tocó un aviso sin sesión, tras entrar se va a Ponte al día */
+  if (!user && route === 'noticias') { try { sessionStorage.setItem(nsKey('jp_tras_login'), 'noticias'); } catch (e) {} }
   if (!user && route !== 'login') return go('login');
   if (route === 'login' || !user) return viewLogin();
   /* 08/11/2026 · Vista apagada desde la privada (js/vistas-pub.js): por enlace
@@ -539,7 +542,7 @@ function viewLogin() {
         if (/no est[aá]s registrad/i.test(r.msg || '')) return avisoSinRegistro();
         return toast(r.msg || 'No se pudo iniciar sesión', 'err');
       }
-      saveSession(r.user); go('home'); ntAutoActivar(r.user);   // 30/07: avisos desde el primer ingreso
+      saveSession(r.user); go(trasLogin()); ntAutoActivar(r.user);   // 30/07: avisos desde el primer ingreso
     } catch (e) { toast('Error de conexión', 'err'); saving(btn, false); }
   };
 
@@ -574,7 +577,7 @@ async function loginCon(documento, pin) {
   try {
     const r = await api('pub.login', {}, 'POST', { documento, pin });
     if (!r.ok) { toast(r.msg || 'PIN incorrecto', 'err'); pinBuffer = ''; paintPin(); return; }
-    saveSession(r.user); go('home'); ntAutoActivar(r.user);   // 30/07: avisos desde el primer ingreso
+    saveSession(r.user); go(trasLogin()); ntAutoActivar(r.user);   // 30/07: avisos desde el primer ingreso
   } catch (e) { toast('Error de conexión', 'err'); pinBuffer = ''; paintPin(); }
 }
 
@@ -3822,7 +3825,7 @@ async function ntActivarAvisos(user, opts) {
     // OJO: scope propio. Si lo registráramos en './' reemplazaría al sw.js de la
     // PWA (dos service workers no pueden compartir scope) y romperíamos el caché
     // y la instalación. Este es el scope que usa el propio SDK de FCM.
-    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: './firebase-cloud-messaging-push-scope' });
+    const reg = await navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: NT_SW_SCOPE, updateViaCache: 'none' });
     const msg = fb.messaging();
     const token = await msg.getToken({ vapidKey: NT_VAPID, serviceWorkerRegistration: reg });
     if (!token) { toast('No se pudo generar el aviso', 'err'); return false; }
@@ -3858,6 +3861,38 @@ function ntAutoActivar(user) {
     if (ntTokenLocal()) return;              // este dispositivo ya está registrado
     Promise.resolve(ntActivarAvisos(user, { silencioso: true })).catch(() => {});
   } catch (e) {}
+}
+
+/* 12/11/2026 · TOCAR EL AVISO (firebase-messaging-sw.js)
+   El SW de avisos no controla la página, así que no puede navegarla: si la app
+   ya está abierta la enfoca y le manda {tipo:'jp-push-abrir'}; aquí se va a
+   Ponte al día. {tipo:'jp-push'} = llegó un aviso con la app abierta. */
+const NT_SW_SCOPE = './firebase-cloud-messaging-push-scope';
+function ntRutaActual() { return (location.hash.replace(/^#\//, '') || '').split('?')[0]; }
+function ntAbrirDesdeAviso() {
+  NT_ABRIR_T0 = performance.now();
+  if (layer && layer.children.length) { try { closeLayer(); } catch (e) {} }
+  if (!getActive()) return go('login');
+  if (ntRutaActual() === 'noticias') return ntCargar(true);
+  go('noticias');
+}
+let NT_ABRIR_T0 = 0;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.tipo === 'jp-push-abrir') ntAbrirDesdeAviso();
+    else if (d.tipo === 'jp-push' && ntRutaActual() === 'noticias') ntAvisoNueva();
+  });
+  /* Modo fresco también para el SW de avisos: sin la caché HTTP y con update()
+     al cargar, para que lo publicado (incluido cómo se abre el aviso) llegue en
+     la primera apertura y no a las 24 h. Solo si este equipo ya tiene avisos. */
+  window.addEventListener('load', () => {
+    try {
+      if (ntPermiso() !== 'granted' || !ntTokenLocal()) return;
+      navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: NT_SW_SCOPE, updateViaCache: 'none' })
+        .then(r => { try { r.update(); } catch (e) {} }).catch(() => {});
+    } catch (e) {}
+  });
 }
 
 function ntPlataforma() {
@@ -4063,6 +4098,16 @@ async function ntCargar(avisar) {
     body.innerHTML = `<div class="nt-feed">${NT_ALL.map(n => ntCardHtml(n, n.ts > leidas)).join('')}</div>`;
   }
   if (avisar) toast('Noticias actualizadas', 'ok');
+  /* 12/11/2026 · medición: del toque del aviso a Ponte al día pintado */
+  try {
+    const frio = /[?&]aviso=1/.test(location.search);
+    if (NT_ABRIR_T0 || frio) {
+      const ms = Math.round(performance.now() - (frio ? 0 : NT_ABRIR_T0));
+      if (window.RED && RED.anotar) RED.anotar({ a: frio ? 'pantalla.avisoAbrirFrio' : 'pantalla.avisoAbrir', ms: ms });
+      NT_ABRIR_T0 = 0;
+      if (frio) history.replaceState(null, '', location.pathname + location.hash);
+    }
+  } catch (e) {}
   // Marcar como leídas después de un momento (para que se alcance a ver la franja "Nuevo")
   const top = NT_ALL.length ? NT_ALL[0].ts : 0;
   if (top) setTimeout(() => ntMarcarLeidas(top), 1500);
