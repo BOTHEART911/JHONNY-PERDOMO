@@ -39,7 +39,9 @@
     comercio:    { t: 'Comercios',     c: 'tz-c-com',   i: '<path d="M3 9 5 4h14l2 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>' },
     resena:      { t: 'Reseñas',       c: 'tz-c-res',   i: '<path d="m12 2 3 6.5 7 .8-5.2 4.7 1.5 7L12 17.4 5.7 21l1.5-7L2 9.3l7-.8Z"/>' },
     seguimiento: { t: 'Seguimiento',   c: 'tz-c-seg',   i: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>' },
-    validacion:  { t: 'Validación',    c: 'tz-c-seg',   i: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m8 12 2.5 2.5L16 9"/>' }
+    validacion:  { t: 'Validación',    c: 'tz-c-seg',   i: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m8 12 2.5 2.5L16 9"/>' },
+    /* 17/11/2026 · líder eliminado: traspaso de referidos (Lideres_Eliminar.gs) */
+    traspaso:    { t: 'Traspaso',      c: 'tz-c-lider', i: '<path d="M4 7h13l-3-3"/><path d="M20 17H7l3 3"/>' }
   };
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   function ico(k) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (TIPOS[k] || TIPOS.alta).i + '</svg>'; }
