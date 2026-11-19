@@ -273,7 +273,7 @@ body.sheet-open .app { touch-action: none; }
   * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @media (min-width: 500px) {
-  .app { box-shadow: var(--sh-1); background: var(--bg); }
+  .app { box-shadow: none; border-inline: 1px solid var(--line); background: var(--bg); }
 }
 
 /* ---------- Formularios y confirmación (módulo participación) ---------- */
@@ -336,13 +336,13 @@ select.input {
 .hidden { display: none !important; }
 .login-wrap { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-card { width: 100%; max-width: 380px; background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--sh-2); padding: 30px 24px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
-.login-card .login-logo { width: 86px; height: 86px; object-fit: contain; border-radius: 22px; background: #fff; padding: 8px; box-shadow: var(--sh-1); margin: 0 auto; }
+.login-card .login-logo { width: 86px; height: 86px; object-fit: contain; border-radius: 22px; background: #fff; padding: 8px; border: 1px solid var(--line); margin: 0 auto; }
 .login-title { font-family: var(--font-display); font-size: 1.7rem; font-weight: 800; color: var(--brand); letter-spacing: -.02em; margin: 12px 0 4px; }
 .login-sub { font-size: .88rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 
 .login-tabs { display: flex; gap: 6px; background: var(--brand-050); padding: 5px; border-radius: 999px; margin: 20px 0 16px; }
 .login-tab { flex: 1; padding: 11px; border-radius: 999px; font-family: var(--font-display); font-weight: 700; font-size: .85rem; color: var(--brand-700); background: transparent; transition: all .18s; }
-.login-tab.active { background: var(--brand); color: #fff; box-shadow: 0 3px 10px rgba(var(--brand-rgb),.32); }
+.login-tab.active { background: var(--brand); color: #fff; box-shadow: 0 1px 2px rgba(10,37,64,.12); }
 
 .pin-hint { font-size: .84rem; color: var(--muted); margin: 4px 0 0; }
 .pin-pad { display: flex; justify-content: center; gap: 14px; margin: 18px 0; }
@@ -362,7 +362,7 @@ select.input {
 .link-install:active { opacity: .6; }
 
 .brand-banner { display: block; margin: 20px auto 4px; width: 200px; max-width: 70%; height: auto; border-radius: 10px; }
-.app-version-line { text-align: center; margin-top: 8px; font-size: .72rem; color: var(--muted); opacity: .7; }
+.app-version-line { text-align: center; margin-top: 8px; font-size: .72rem; color: var(--muted); }
 
 /* ============================================================
    MÓDULO LÍDERES — tarjetas de referido, badges, selector
@@ -614,7 +614,7 @@ body.wide .com-card { max-width: 360px; margin: 0 auto; width: 100%; }
 .com-card {
   background: #fff; border: 1px solid rgba(var(--brand-rgb),.16);
   border-radius: var(--r-lg, 18px); padding: 16px;
-  box-shadow: 0 6px 20px rgba(var(--brand-900-rgb),.06);
+  box-shadow: 0 1px 2px rgba(10,37,64,.12);
 }
 .com-card-title { text-align: center; font-family: var(--font-display); font-weight: 900; color: var(--brand); margin: 2px 0 2px; font-size: 1.12rem; text-transform: uppercase; line-height: 1.2; }
 .com-card-sub   { text-align: center; color: #777; margin: 0 0 8px; font-size: .8rem; font-weight: 600; }
@@ -712,7 +712,7 @@ button.com-media:active { transform: scale(.985); }
   position: absolute; top: 8px; right: 8px; min-width: 20px; height: 20px; padding: 0 6px;
   border-radius: 999px; background: var(--danger); color: #fff;
   font-size: 11px; font-weight: 800; line-height: 20px; text-align: center;
-  box-shadow: 0 2px 6px rgba(214, 69, 69, .45);
+  box-shadow: 0 1px 2px rgba(10,37,64,.12);
 }
 
 /* Tarjeta de avisos */
@@ -894,8 +894,8 @@ body.wide .casa-map { aspect-ratio: 21 / 9; }
   flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px;
   display: grid; place-content: center; font-family: var(--font-display);
   font-weight: 800; font-size: 17px; color: #fff;
-  background: radial-gradient(120% 120% at 30% 0%, var(--brand) 0%, var(--brand-700) 75%);
-  box-shadow: 0 6px 16px rgba(var(--brand-rgb),.28);
+  background: var(--brand);
+  box-shadow: 0 1px 2px rgba(10,37,64,.12);
 }
 .md-list { display: flex; flex-direction: column; gap: 8px; }
 .md-row {
@@ -1100,10 +1100,10 @@ body.wide .com-list { grid-template-columns: 1fr; justify-content: initial; }
 .rs-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
   padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
-  box-shadow: 0 1px 2px rgba(var(--brand-900-rgb), .04), 0 6px 18px rgba(var(--brand-900-rgb), .05);
+  box-shadow: 0 1px 2px rgba(10,37,64,.12), 0 6px 18px rgba(var(--brand-900-rgb), .05);
   transition: box-shadow .18s ease, transform .18s ease;
 }
-.rs-card:hover { box-shadow: 0 2px 6px rgba(var(--brand-900-rgb), .06), 0 12px 28px rgba(var(--brand-900-rgb), .09); }
+.rs-card:hover { box-shadow: 0 1px 2px rgba(10,37,64,.12), 0 12px 28px rgba(var(--brand-900-rgb), .09); }
 .rs-card-main { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
 .rs-card-body { min-width: 0; flex: 1; }
 
@@ -1295,7 +1295,7 @@ body.wide .com-list { grid-template-columns: 1fr; justify-content: initial; }
 
 /* "Vivo": mientras nadie lo ha tocado, un halo que respira para que se note
    que ahí se filtra. Se apaga al primer toque. */
-.com-cat-btn.vivo { animation: comLatido 2.4s ease-in-out infinite; }
+.com-cat-btn.vivo { box-shadow: 0 0 0 2px rgba(var(--brand-rgb),.35); }
 @keyframes comLatido {
   0%, 100% { box-shadow: 0 0 0 0 rgba(var(--brand-rgb), .32); }
   50%      { box-shadow: 0 0 0 7px rgba(var(--brand-rgb), 0); }
@@ -1306,7 +1306,7 @@ body.wide .com-list { grid-template-columns: 1fr; justify-content: initial; }
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 232px; max-width: 78vw;
   max-height: 320px; overflow: auto; padding: 6px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
-  box-shadow: 0 12px 34px rgba(var(--brand-900-rgb), .16);
+  box-shadow: 0 1px 2px rgba(10,37,64,.12);
   animation: comAbre .16s ease-out;
 }
 .com-cat-menu.hidden { display: none; }
