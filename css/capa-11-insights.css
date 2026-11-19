@@ -296,6 +296,7 @@
 .iq-cargando { display: flex; align-items: center; gap: 10px; }
 .iq-carga-tx { color: var(--muted); font-size: 13.5px; }
 .iq-pts { display: inline-flex; gap: 4px; }
+/* impeccable-disable pulsing-dot: indicador de «pensando» del analista (solo mientras responde) */
 .iq-pts i {
   width: 6px; height: 6px;
   border-radius: 50%;

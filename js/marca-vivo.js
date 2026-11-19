@@ -153,12 +153,27 @@
 
   /* Paleta completa a partir del color principal. Pública para poder
      probarla y para quien necesite los tokens sin tocar el CSS. */
+  /* 18/11/2026 · Marcador: el --brand de la app es la versión del color que
+     pasa 4,5:1 con letra blanca (botones, pastillas, enlaces). El color tal
+     cual llega de CONFIG queda en --brand-graf para gráficas y fondos sin texto. */
+  function luz(hex) {
+    var r = hexRgb(hex); if (!r) return 1;
+    var c = r.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function accesible(hex) {
+    var r = hexRgb(hex); if (!r) return hex;
+    var p = rgbHsl(r[0], r[1], r[2]), l = p[2], h = hex;
+    while (1.05 / (luz(h) + 0.05) < 4.6 && l > 0.08) { l -= 0.02; h = hslHex(p[0], p[1], l); }
+    return h;
+  }
   function paleta(color, color700, c900, c050) {
     var p900 = txt(c900) || derivar900(color);
     var p050 = txt(c050) || derivar050(color);
+    var acc = accesible(color);
     return {
-      brand: color, brand700: color700, brand900: p900, brand050: p050,
-      brandRgb: rgbTxt(color), brand700Rgb: rgbTxt(color700), brand900Rgb: rgbTxt(p900)
+      brand: acc, brandGraf: color, brand700: color700, brand900: p900, brand050: p050,
+      brandRgb: rgbTxt(acc), brand700Rgb: rgbTxt(color700), brand900Rgb: rgbTxt(p900)
     };
   }
 
@@ -189,6 +204,7 @@
 
     var css = ':root{' +
       '--brand:' + p.brand + ';' +
+      '--brand-graf:' + p.brandGraf + ';' +
       '--brand-700:' + p.brand700 + ';' +
       '--brand-rgb:' + p.brandRgb + ';' +
       '--brand-700-rgb:' + p.brand700Rgb + ';' +

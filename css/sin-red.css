@@ -55,10 +55,10 @@ html.oscuro .sr-tira--ok { background: rgba(30,158,106,.18); color: #6EE7B7; box
 .sr-acc .btn { flex: 1 1 140px; }
 .sr-nota { margin: 0; font-size: 13px; color: var(--muted); }
 .sr-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-.sr-card { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--sh-1); }
-.sr-card--ok { border-left-color: var(--ok); }
-.sr-card--cor { border-left-color: #F59E0B; }
-.sr-card--ex, .sr-card--rep { border-left-color: var(--danger); }
+.sr-card { background: var(--surface); border: 1px solid var(--line); border: 2px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--sh-1); }
+.sr-card--ok { border-color: var(--ok); }
+.sr-card--cor { border-color: #F59E0B; }
+.sr-card--ex, .sr-card--rep { border-color: var(--danger); }
 .sr-card--fu { opacity: .6; }
 .sr-card-top { display: flex; align-items: flex-start; gap: 8px; }
 .sr-card-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }

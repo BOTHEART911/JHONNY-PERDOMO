@@ -141,5 +141,5 @@ html.oscuro .com-opt:hover,html.oscuro .com-opt.on{ background:var(--brand-050);
 /* 31/08/2026 · gráfica del año y aviso de modo padrino */
 html.oscuro .lr-gb-col{ background:#333A45; }
 html.oscuro .lr-gb:hover, html.oscuro .lr-gb.on{ background:#333D4C; }
-html.oscuro .lr-padrino{ background:#3A342B; border-color:#5C4A2E; border-left-color:#C8791C; color:#E9C79B; }
+html.oscuro .lr-padrino{ background:#3A342B; border-color:#5C4A2E; border-color:#C8791C; color:#E9C79B; }
 html.oscuro .lr-padrino-t .small{ color:#C9AC7E; }

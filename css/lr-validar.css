@@ -33,7 +33,7 @@
 .lrv-buscar .input { width: 100%; }
 .lrv-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
 
-.lrv-card { background: var(--surface); border-radius: var(--r-md); padding: 14px; box-shadow: var(--sh-1); border: 1px solid var(--line); border-top: 4px solid #F59E42; display: flex; flex-direction: column; gap: 10px; transition: opacity .25s, transform .25s; }
+.lrv-card { background: var(--surface); border-radius: var(--r-md); padding: 14px; box-shadow: var(--sh-1); border: 1px solid var(--line); border: 2px solid #F59E42; display: flex; flex-direction: column; gap: 10px; transition: opacity .25s, transform .25s; }
 .lrv-card.muerte { border-top-color: #6B7280; }
 .lrv-card.sale { opacity: 0; transform: scale(.96); }
 .lrv-top { display: flex; gap: 10px; align-items: center; }
